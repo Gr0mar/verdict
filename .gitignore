@@ -1,0 +1,8 @@
+# Local-only planning artifacts (never committed)
+docs/superpowers/
+
+node_modules/
+.DS_Store
+
+# Plan execution scratch (never committed)
+.superpowers/

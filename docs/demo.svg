@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">
+  <defs>
+    <style>
+      .t { fill: #cdd6f4; }
+      .dim { fill: #6c7086; }
+      .ok { fill: #a6e3a1; }
+      .warn { fill: #f9e2af; }
+      .path { fill: #89b4fa; }
+      .label { fill: #bac2de; font-size: 12px; letter-spacing: 1px; }
+    </style>
+  </defs>
+
+  <!-- before -->
+  <text x="20" y="22" class="label">WITHOUT</text>
+  <rect x="20" y="32" width="440" height="378" rx="8" fill="#1e1e2e" stroke="#313244"/>
+  <circle cx="40" cy="48" r="5" fill="#f38ba8"/><circle cx="56" cy="48" r="5" fill="#f9e2af"/><circle cx="72" cy="48" r="5" fill="#a6e3a1"/>
+  <g class="t">
+    <text x="36" y="76" class="dim">&gt; review this branch</text>
+    <text x="36" y="100">Here's a detailed review of the branch. I went</text>
+    <text x="36" y="118">through all 14 changed files and found several</text>
+    <text x="36" y="136">things worth discussing in depth:</text>
+    <text x="36" y="160">## 1. State handling in useBudget.ts</text>
+    <text x="36" y="178">The hook recomputes the total on every render</text>
+    <text x="36" y="196">because the dependency array includes the whole</text>
+    <text x="36" y="214">items object rather than its stable id. This</text>
+    <text x="36" y="232">matters because the parent re-renders on every</text>
+    <text x="36" y="250">keystroke, so the reducer runs ~40 times per...</text>
+    <text x="36" y="274">## 2. Empty state of the transaction list</text>
+    <text x="36" y="292">When the API returns an empty array the list</text>
+    <text x="36" y="310">renders nothing at all, which looks like a bug</text>
+    <text x="36" y="328">to the user. Consider rendering the EmptyState...</text>
+    <text x="36" y="352">## 3. Naming</text>
+    <text x="36" y="370">`handleClick2` and `tmpData` should be renamed...</text>
+    <text x="36" y="394" class="dim">▼ 61 more lines</text>
+  </g>
+
+  <!-- after -->
+  <text x="500" y="22" class="label">WITH THE TERMINAL BUDGET</text>
+  <rect x="500" y="32" width="440" height="150" rx="8" fill="#1e1e2e" stroke="#313244"/>
+  <circle cx="520" cy="48" r="5" fill="#f38ba8"/><circle cx="536" cy="48" r="5" fill="#f9e2af"/><circle cx="552" cy="48" r="5" fill="#a6e3a1"/>
+  <g class="t">
+    <text x="516" y="76" class="dim">&gt; review this branch</text>
+    <text x="516" y="100"><tspan class="ok">●</tspan> Mergeable after two fixes.</text>
+    <text x="516" y="122">  - useBudget.ts:41 recomputes each render — memoise</text>
+    <text x="516" y="140">  - empty list state is never rendered</text>
+    <text x="516" y="162">  <tspan class="path">~/claude-out/my-app/2026-10-13-review-budget.md</tspan></text>
+  </g>
+
+  <!-- editor window -->
+  <rect x="500" y="200" width="440" height="210" rx="8" fill="#181825" stroke="#313244"/>
+  <rect x="500" y="200" width="440" height="26" rx="8" fill="#11111b"/>
+  <text x="516" y="218" class="dim">2026-10-13-review-budget.md — opened in your editor</text>
+  <g class="t">
+    <text x="516" y="248" class="warn"># Review: budget screen</text>
+    <text x="516" y="270"><tspan class="ok">Verdict:</tspan> mergeable after two fixes.</text>
+    <text x="516" y="294" class="warn">## 1. State handling in useBudget.ts</text>
+    <text x="516" y="312">The hook recomputes the total on every render</text>
+    <text x="516" y="330">because the dependency array includes the whole</text>
+    <text x="516" y="348">items object rather than its stable id...</text>
+    <text x="516" y="372" class="warn">## 2. Empty state of the transaction list</text>
+    <text x="516" y="390" class="dim">searchable · rendered · reopen any time</text>
+  </g>
+</svg>
