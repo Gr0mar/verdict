@@ -10,8 +10,8 @@ A terminal budget for [Claude Code](https://code.claude.com). The output style a
 
 ## Why
 
-- **The terminal is for commands and decisions, not for reading.** A 5 000-character review in scrollback is unsearchable, unformatted and gone after the next command. In your editor it has rendering, search, scroll and copy-paste into the ticket.
-- **Verdict first.** You know within two seconds whether you need to act, read on, or move on.
+- **You are there to decide, not to read.** Claude Code answers with pages; what you need from each turn is the answer, the question it has for you, or the sign that something went wrong. With the verdict first, the decision takes seconds — and you keep an overview of what the AI is doing without reading everything it writes.
+- **The details are moved, not lost.** The full review, research or plan lands in a file that opens in your editor — rendered, searchable, reopenable, ready to paste into a ticket — instead of a 5 000-character block in scrollback that is gone after the next command.
 - **Measured, not just requested.** Instructions in `CLAUDE.md` drift under long sessions and plugins. A hook runs on every reply: when the model ignores the rule, it is sent back to write the file and answer again.
 - **Long content becomes files.** Reviews, research and plans live under `~/claude-out/<project>/` where you can reopen, diff and share them instead of losing them in the scrollback.
 - **One phrase lifts the budget** for a single turn when you do want the whole thing in the terminal.
