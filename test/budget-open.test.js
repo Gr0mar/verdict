@@ -6,6 +6,8 @@ const path = require('path');
 const { makeSandbox, writeConfig, runHook, readState, cleanup } = require('./helpers');
 
 const HOOK = 'budget-open.js';
+// Arguments the default open command passes before the file path: `open -a Cursor` on macOS, bare `xdg-open` elsewhere.
+const DEFAULT_ARGS = process.platform === 'darwin' ? ['-a', 'Cursor'] : [];
 
 function writeEvent(filePath, toolName = 'Write', sessionId = 'sess-1') {
   return { session_id: sessionId, hook_event_name: 'PostToolUse', tool_name: toolName, tool_input: { file_path: filePath, content: '# x' }, tool_response: {} };
@@ -51,7 +53,7 @@ test('a Markdown file under outDir is recorded and opened with the open command'
   assert.equal(result.status, 0);
   assert.equal(result.stdout, '');
   assert.deepEqual(readState(sandbox, 'sess-1').written, [fs.realpathSync(file)]);
-  assert.deepEqual(waitForOpenCalls(sandbox, 3), ['-a', 'Cursor', fs.realpathSync(file)]);
+  assert.deepEqual(waitForOpenCalls(sandbox, DEFAULT_ARGS.length + 1), [...DEFAULT_ARGS, fs.realpathSync(file)]);
 });
 
 test('openApp from config is used', (t) => {
@@ -84,7 +86,7 @@ test('the hook does not wait for an opener that stays in the foreground', (t) =>
   const result = runHook(HOOK, writeEvent(file), sandbox, { VERDICT_OPEN_CMD: slowOpener });
   assert.equal(result.status, 0);
   assert.ok(Date.now() - started < 2000, 'hook returned before the opener finished');
-  assert.deepEqual(waitForOpenCalls(sandbox, 3), ['-a', 'Cursor', fs.realpathSync(file)]);
+  assert.deepEqual(waitForOpenCalls(sandbox, DEFAULT_ARGS.length + 1), [...DEFAULT_ARGS, fs.realpathSync(file)]);
 });
 
 test('existing state is preserved, paths are not duplicated', (t) => {
