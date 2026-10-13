@@ -1,0 +1,51 @@
+name: Bug report
+description: Something does not behave as the README says
+labels: [bug]
+body:
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options:
+        - Claude Code
+        - Codex
+        - Both
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: verdict version, agent version (`claude --version` / `codex --version`), Node version, OS
+      placeholder: verdict 0.2.0, Claude Code 2.1.296, Node 22.19, macOS 15
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install method
+      options:
+        - Plugin (/plugin install verdict@gr0mar)
+        - Checkout (install.sh)
+        - Checkout (install.sh --codex)
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The prompt, what the agent replied, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log lines
+      description: Output of `tail -5 ~/.claude/state/verdict/budget.log.jsonl` around the problem (remove anything private).
+      render: json
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: Contents of `~/.config/verdict/budget.json`, if you have one.
+      render: json

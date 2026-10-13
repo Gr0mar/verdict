@@ -154,6 +154,10 @@ install.sh
 test/
 ```
 
+## Contributing
+
+Bugs and feature requests go to [issues](https://github.com/Gr0mar/verdict/issues) (the templates ask for the agent, the version and a few log lines); setups and questions to [Discussions](https://github.com/Gr0mar/verdict/discussions). Before a pull request, read [CONTRIBUTING.md](CONTRIBUTING.md): tests first, hooks fail open, no dependencies.
+
 ## Licence
 
 [MIT](LICENSE)

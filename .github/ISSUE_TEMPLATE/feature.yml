@@ -1,0 +1,27 @@
+name: Feature request
+description: Something verdict should do, or do differently
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options:
+        - Claude Code
+        - Codex
+        - Both
+        - Another agent (say which)
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What happens today that you want to change, with an example reply or turn if you have one.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should happen instead. A rough idea is fine.
