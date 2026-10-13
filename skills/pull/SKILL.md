@@ -3,7 +3,7 @@ name: pull
 description: Brings the repository you are standing in up to date and reports what changed. Fast-forward pull of the current branch, dependency install when the lockfile changed, code generation when package.json has a generator script, and a comparison with what you expected to land.
 argument-hint: "[what you expect to have landed]"
 disable-model-invocation: true
-allowed-tools: Bash(git rev-parse *) Bash(git status *) Bash(git pull --ff-only) Bash(git log *) Bash(git diff *) Bash(git submodule update --init)
+allowed-tools: Bash(git rev-parse --show-toplevel) Bash(git rev-parse HEAD) Bash(git rev-parse --abbrev-ref @{u}) Bash(git status --porcelain --untracked-files=no) Bash(git pull --ff-only) Bash(git submodule update --init)
 ---
 
 Bring the repository I am standing in up to date and ready to work on. Only this repository — the one that contains the current working directory.

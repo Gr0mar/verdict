@@ -53,23 +53,25 @@ test('skills: frontmatter follows the Claude Code reference, bodies carry the ow
     assert.ok(body.includes('$ARGUMENTS'), `${name}: $ARGUMENTS`);
     assert.match(body, /placeholder[^.]*(my|the user's) message/, `${name}: Codex leaves the placeholder in place, so the argument is then taken from the message`);
     assert.ok(body.includes(expected.phrase), `${name}: phrase "${expected.phrase}"`);
-    assert.ok(body.length < 3600, `${name}: body is ${body.length} chars; it is loaded on every invocation, keep it lean`);
+    // Loaded only when invoked (disable-model-invocation), so the cost is per run, not per turn.
+    assert.ok(body.length < 4000, `${name}: body is ${body.length} chars; keep it lean`);
   }
   assert.equal(fs.existsSync(path.join(ROOT, 'skills', 'odstup')), false, 'old odstup skill removed');
   assert.equal(fs.existsSync(path.join(ROOT, 'skills', 'pullnul')), false, 'old pullnul skill removed');
 });
 
-// Exactly the read-only git and gh calls each body runs, plus the fast-forward pull and the
-// submodule checkout. Installs run arriving code, gh api can write, commit and push change
-// history: those keep prompting. (git diff/log/show accept --output=<file>; accepted — a
-// review has no reason to write, and the model would have to ask for that flag on purpose.)
+// Snapshot of the pre-approved commands: exact read-only calls, the fast-forward pull and the
+// submodule checkout. No wildcard on git diff/log/show — they accept --output=<file>, and a
+// reviewed file could talk the model into writing somewhere without a prompt. Installs run
+// arriving code, gh api can write, commit and push change history: all of those keep prompting,
+// and so does every git call the bodies run with a variable part (a SHA, a path).
 const ALLOWED_TOOLS = {
-  fresh: 'Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git show *)',
-  copilot: 'Bash(gh pr view *) Bash(git branch --show-current) Bash(git rev-parse *)',
-  pull: 'Bash(git rev-parse *) Bash(git status *) Bash(git pull --ff-only) Bash(git log *) Bash(git diff *) Bash(git submodule update --init)',
+  fresh: 'Bash(git status --short --branch --untracked-files=all) Bash(git diff HEAD) Bash(git log --oneline -15) Bash(git log --oneline origin/HEAD..HEAD) Bash(git diff origin/HEAD...HEAD) Bash(gh pr view *) Bash(gh pr diff *)',
+  copilot: 'Bash(gh pr view *) Bash(git branch --show-current) Bash(git rev-parse HEAD)',
+  pull: 'Bash(git rev-parse --show-toplevel) Bash(git rev-parse HEAD) Bash(git rev-parse --abbrev-ref @{u}) Bash(git status --porcelain --untracked-files=no) Bash(git pull --ff-only) Bash(git submodule update --init)',
 };
 
-test('skills: pre-approved commands are exactly the read-only calls each body runs, plus the fast-forward pull', () => {
+test('skills: pre-approved commands are exact read-only calls plus the fast-forward pull (snapshot)', () => {
   for (const [name, rules] of Object.entries(ALLOWED_TOOLS)) {
     const { fields } = frontmatter(path.join(ROOT, 'skills', name, 'SKILL.md'));
     assert.equal(fields['allowed-tools'], rules, name);
@@ -117,11 +119,23 @@ test('/fresh runs in a forked read-only agent that waits for the result; the oth
   assert.equal(fields.context, 'fork', 'fresh eyes means a context that did not write the code');
   assert.equal(fields.agent, 'Explore', 'the built-in read-only agent: no Write or Edit tool at all');
   assert.equal(fields.background, 'false', 'the invoking turn waits for the review');
+  assert.equal(fields.model, 'inherit', 'the review runs on the session model, not on a smaller default of the agent type');
+  assert.match(body, /you do not run tests or anything that changes state/, 'Explore refuses state changes anyway; say so instead of promising test runs');
+  assert.match(body, /`git log --oneline origin\/HEAD\.\.HEAD`/, 'a clean tree has a named base: the default branch');
+  assert.match(body, /In-session, write it yourself with the file-writing tool/, 'Codex runs in-session, so the report write is explicit there');
   // The fork sees no conversation, so the repository state is injected before the prompt is sent.
-  assert.match(body, /^!`git status --short`$/m);
+  // --branch keeps the injection non-empty on a clean tree; --untracked-files=all lists the files
+  // inside a new directory instead of one "?? dir/" line.
+  assert.match(body, /^!`git status --short --branch --untracked-files=all`$/m);
   assert.match(body, /^!`git log --oneline -15`$/m);
   assert.match(body, /run the commands yourself/, 'Codex shows the injection lines literally');
+  assert.match(body, /in-session, set aside what you saw/, 'Codex runs the review in the same session');
   assert.match(body, /"Questions"/, 'unknown intent becomes a question, not a finding');
+  assert.match(body, /`CLAUDE\.md` and `REVIEW\.md`/, 'Explore skips CLAUDE.md, so the skill reads the project rules itself');
+  assert.match(body, /`gh pr diff <n>`/, 'a PR number is a valid scope');
+  assert.match(body, /no uncommitted changes and that range is empty, say so and stop/);
+  assert.match(body, /ordered by severity, then by what a user would hit first/);
+  assert.match(body, /refused or fails is listed under "Checked:" as not run/);
   for (const name of ['copilot', 'pull']) {
     const other = frontmatter(path.join(ROOT, 'skills', name, 'SKILL.md')).fields;
     assert.equal(other.context, undefined, `${name} edits or pulls, it needs the session`);
@@ -141,7 +155,6 @@ test('/fresh defines severity, lists what was checked, verifies before reporting
   assert.match(body, /"Out of scope"/);
   assert.match(body, /code, configuration, docs, migrations/);
   assert.match(body, /git diff HEAD/);
-  assert.match(body, /nothing changed/);
   assert.match(body, /must not change any file/, 'a review changes nothing');
   assert.match(body, /every `\?\?` file/, 'untracked files are part of the review; git diff HEAD does not show them');
   assert.match(body, /Report what you verified/, 'no speculative findings');
@@ -206,27 +219,34 @@ test('/copilot reads review threads, skips resolved ones, knows both bot logins 
   assert.match(body, /reviews --paginate/, 'review summaries are paged too');
   assert.match(body, /"Suppressed comments \(N\)"/, 'the section Copilot uses for comments it did not post as threads (seen live on 2026-10-13)');
   assert.match(body, /"Comments suppressed due to low confidence \(N\)"/, 'the older heading of the same section');
-  assert.match(body, /skip one that a PR comment already quotes/, 'a second run must not raise the same suppressed comment again');
-  assert.match(body, /headRefOid/, 'the checked-out commit must be the PR head, a branch name alone is not enough');
+  assert.match(body, /skip one that a PR comment already quotes \(`gh pr view <number> --comments`\)/, 'a second run must not raise the same suppressed comment again');
+  assert.match(body, /Skip a thread whose last comment is yours unless Copilot answered after it/, 'a reply that posted but did not resolve is not re-judged');
+  assert.match(body, /earlier wording:/, 'the older heading is a wording, not an older review');
+  assert.match(body, /gh pr view \[<number>\] --json number,url,headRefName,headRefOid,state/, 'one command for both the explicit and the current-branch path');
   assert.match(body, /git rev-parse HEAD/);
+  assert.match(body, /or `state` not `OPEN`: say so and stop/, 'a merged or closed PR ends the skill before any edit');
+  assert.match(body, /re-read `state` and `headRefOid`; stop unless the PR is still `OPEN` and its head is still your HEAD/, 'checked again right before the push');
+  assert.match(body, /a rejected push stops everything — no replies, no resolving/);
+  assert.match(body, /Threads with a question stay open/);
   assert.match(body, /a failure goes into the report/, 'failing tests are reported, not papered over');
   assert.match(body, /gh pr comment <number> --body/, 'suppressed comments are answered with a named command');
   assert.match(body, /applied \/ declined \/ asked/, 'the questions waiting on the user are counted too');
   // Threads are resolved only once the fixes are on the PR: approval → commit and push → replies → resolve.
   const approval = body.indexOf('wait for approval');
-  const push = body.indexOf('commit the fixes on the PR branch and push');
+  const push = body.indexOf('ommit the fixes on the PR branch and push');
   const replies = body.indexOf('/replies');
   const resolve = body.indexOf('resolveReviewThread');
   assert.ok(approval > -1 && push > approval && replies > push && resolve > replies, 'order: approval, push, replies, resolve');
   // Checked on 2026-10-13 against live responses: GraphQL reports the bot as
   // copilot-pull-request-reviewer, REST review comments as Copilot, REST reviews as
-  // copilot-pull-request-reviewer[bot]. If GitHub renames it, the skill lists the logins it saw.
+  // copilot-pull-request-reviewer[bot]. If GitHub renames it to something that still contains
+  // "copilot", the skill lists the logins it saw; a rename without that word is a blind spot.
   assert.match(body, /`copilot-pull-request-reviewer`/);
   assert.match(body, /`Copilot`/);
   assert.match(body, /`copilot-pull-request-reviewer\[bot\]`/);
   assert.match(body, /ignoring case/);
   assert.match(body, /list the logins you saw and stop/);
-  assert.match(body, /git branch --show-current/, 'an explicit PR number is checked against the checked-out branch');
+  assert.match(body, /git branch --show-current/, 'the checked-out branch is compared with the PR head on both paths');
   assert.match(body, /say so and stop/, 'no PR or nothing to do ends the skill');
   assert.match(body, /Do not commit or push yet/);
 });
