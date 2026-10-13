@@ -1,8 +1,8 @@
 {
   "name": "verdict",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "A terminal budget for Claude Code: verdict first, long content to a Markdown file that opens in your editor, measured by a Stop hook",
+  "description": "A terminal budget for Claude Code and Codex: verdict first, long content to a Markdown file that opens in your editor, measured by a Stop hook",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 'use strict';
-// verdict — PostToolUse hook (matcher: Write).
-// When Claude writes a Markdown file under outDir, records it in the session state
-// and opens it in the configured app. Never blocks, never prints to stdout.
+// verdict — PostToolUse hook (matcher: Write|apply_patch).
+// When the agent writes a Markdown file under outDir — Claude Code's Write tool or
+// Codex's apply_patch — records it in the session state and opens it in the
+// configured app. Never blocks, never prints to stdout.
 
 const fs = require('fs');
 const path = require('path');
@@ -24,6 +25,29 @@ function resolveOutFile(filePath, outDir) {
   } catch (e) {
     return null;
   }
+}
+
+// Codex edits files through apply_patch; the patch names each file it adds, updates or
+// renames to. Codex accepts indented headers, so the regex does too.
+const PATCH_FILE_LINE = /^\s*\*\*\* (?:Add File|Update File|Move to): (.+?)\s*$/gm;
+
+function patchedPaths(command, cwd) {
+  if (typeof command !== 'string') return [];
+  const paths = [];
+  for (const match of command.matchAll(PATCH_FILE_LINE)) {
+    const file = match[1];
+    if (path.isAbsolute(file)) paths.push(file);
+    else if (typeof cwd === 'string') paths.push(path.resolve(cwd, file));
+  }
+  return paths;
+}
+
+// Every path the tool call may have written, before the outDir check.
+function candidatePaths(data) {
+  const input = data.tool_input || {};
+  if (data.tool_name === 'Write') return [input.file_path];
+  if (data.tool_name === 'apply_patch') return patchedPaths(input.command, data.cwd);
+  return [];
 }
 
 function recordWritten(sessionId, resolved) {
@@ -49,12 +73,15 @@ function openFile(resolved, config) {
 function main(raw) {
   try {
     const data = JSON.parse(raw);
-    if (data.tool_name !== 'Write') return;
+    const candidates = candidatePaths(data);
+    if (candidates.length === 0) return;
     const config = loadConfig();
-    const resolved = resolveOutFile(data.tool_input && data.tool_input.file_path, config.outDir);
-    if (!resolved) return;
-    recordWritten(data.session_id, resolved);
-    openFile(resolved, config);
+    for (const candidate of candidates) {
+      const resolved = resolveOutFile(candidate, config.outDir);
+      if (!resolved) continue;
+      recordWritten(data.session_id, resolved);
+      openFile(resolved, config);
+    }
   } catch (e) {
     // fail-open: never block, never print
   }
@@ -62,4 +89,4 @@ function main(raw) {
 
 if (require.main === module) readStdin(main);
 
-module.exports = { isInside, resolveOutFile, recordWritten };
+module.exports = { isInside, resolveOutFile, recordWritten, patchedPaths, candidatePaths };

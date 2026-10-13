@@ -27,7 +27,9 @@ test('verdict output style: frontmatter and the budget rule', () => {
   assert.match(body, /12 lines/);
   assert.match(body, /900 characters/);
   assert.match(body, /~\/claude-out\/<project>\/<YYYY-MM-DD>-<slug>\.md/);
-  assert.match(body, /Write tool/);
+  assert.match(body, /as a Markdown file/);
+  assert.match(body, /Claude Code: the Write tool; Codex: apply_patch/, 'the rule names the writes the hook can see');
+  assert.match(body, /not a shell command/);
 });
 
 test('skills: frontmatter name matches the directory, bodies carry the owner wording', () => {
@@ -46,6 +48,13 @@ test('skills: frontmatter name matches the directory, bodies carry the owner wor
   }
   assert.equal(fs.existsSync(path.join(ROOT, 'skills', 'odstup')), false, 'old odstup skill removed');
   assert.equal(fs.existsSync(path.join(ROOT, 'skills', 'pullnul')), false, 'old pullnul skill removed');
+});
+
+test('skills: Codex metadata keeps every skill user-invoked only', () => {
+  for (const name of ['fresh', 'copilot', 'pull']) {
+    const meta = fs.readFileSync(path.join(ROOT, 'skills', name, 'agents', 'openai.yaml'), 'utf8');
+    assert.match(meta, /allow_implicit_invocation:\s*false/, `${name}: Codex must not start this skill on its own`);
+  }
 });
 
 test('/pull is generic: only the cwd repository, clean tree, fast-forward only, deps by lockfile, no internal tooling', () => {
@@ -67,6 +76,33 @@ test('nothing shipped names a machine-specific path or a specific editor', () =>
   }
   const style = fs.readFileSync(path.join(ROOT, 'output-styles', 'verdict.md'), 'utf8');
   assert.doesNotMatch(style, /Cursor|VS Code/, 'the editor is configuration, not part of the rule');
+});
+
+test('plugin manifests: one repo is the plugin and its own marketplace, versions agree', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  const plugin = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'plugin.json'), 'utf8'));
+  assert.equal(plugin.name, 'verdict');
+  assert.equal(plugin.version, pkg.version);
+  assert.ok(plugin.description.length > 0);
+  const marketplace = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'marketplace.json'), 'utf8'));
+  assert.equal(marketplace.name, 'gr0mar');
+  assert.equal(marketplace.owner.name, 'Gr0mar');
+  // The entry carries no display fields of its own: plugin.json is the single source of truth.
+  assert.deepEqual(marketplace.plugins, [{ name: 'verdict', source: './' }]);
+});
+
+test('plugin hooks.json: exactly what the installer registers, rooted at CLAUDE_PLUGIN_ROOT', () => {
+  const { mergeHooks, HOOK_EVENTS } = require('../install/merge-settings');
+  const bundled = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks', 'hooks.json'), 'utf8'));
+  assert.deepEqual(bundled, { hooks: mergeHooks({}, '${CLAUDE_PLUGIN_ROOT}/hooks').hooks });
+  for (const { script } of HOOK_EVENTS) {
+    assert.ok(fs.existsSync(path.join(ROOT, 'hooks', script)), `${script} exists`);
+  }
+});
+
+test('verdict output style applies automatically when installed as a plugin', () => {
+  const { fields } = frontmatter(path.join(ROOT, 'output-styles', 'verdict.md'));
+  assert.equal(fields['force-for-plugin'], 'true');
 });
 
 test('/copilot matches the Copilot login ignoring case and resolves threads only after approval', () => {

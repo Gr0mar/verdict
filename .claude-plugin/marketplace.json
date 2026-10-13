@@ -1,0 +1,16 @@
+{
+  "name": "gr0mar",
+  "owner": {
+    "name": "Gr0mar",
+    "url": "https://github.com/Gr0mar"
+  },
+  "metadata": {
+    "description": "Plugins by Gr0mar"
+  },
+  "plugins": [
+    {
+      "name": "verdict",
+      "source": "./"
+    }
+  ]
+}
