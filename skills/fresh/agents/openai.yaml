@@ -1,2 +1,5 @@
+interface:
+  display_name: "Fresh eyes"
+  short_description: "Fresh-eyes review of recent work or a scope; findings by severity"
 policy:
   allow_implicit_invocation: false

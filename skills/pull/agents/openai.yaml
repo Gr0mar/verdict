@@ -1,2 +1,5 @@
+interface:
+  display_name: "Pull and sync"
+  short_description: "Fast-forward pull, install on lockfile change, run the generator"
 policy:
   allow_implicit_invocation: false

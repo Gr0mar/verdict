@@ -36,7 +36,7 @@ In the Codex desktop app the rule alone produces a verdict plus a link to the fu
 
 ## Skills in Codex
 
-The skills are invoked as `$fresh`, `$copilot`, `$pull` (or through `/skills`). Codex does not substitute the `$ARGUMENTS` placeholder — the model sees the literal text and treats what you type after the skill name as the argument. Each skill ships `agents/openai.yaml` with `allow_implicit_invocation: false`, so Codex never starts them on its own.
+The skills are invoked as `$fresh`, `$copilot`, `$pull` (or through `/skills`). Codex does not substitute the `$ARGUMENTS` placeholder — the model sees the literal text and treats what you type after the skill name as the argument. Each skill ships `agents/openai.yaml` with `allow_implicit_invocation: false`, so Codex never starts them on its own, plus `interface.display_name` and `short_description`, the user-facing name and description the ChatGPT desktop app shows for a skill.
 
 Pasted text arrives inline in Codex, so unlike Claude Code, words inside it can lift the budget for that turn.
 

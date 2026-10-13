@@ -66,13 +66,13 @@ Request phrases only — `detail view`, `full width` or `code review of the whol
 | `openCommand` | `["open","-a","Cursor"]` / `["xdg-open"]` | executable plus arguments, file path appended; overrides `openApp` |
 | `detailPattern` | request phrases, English + Czech | case-insensitive regex that lifts the budget for one turn |
 
-The style text carries the defaults (`12 lines`, `~/claude-out`); if you change them, edit `output-styles/verdict.md` to match (checkout install only — see [docs/plugin.md](docs/plugin.md)).
+The style text and the three skills carry the defaults (`12 lines`, `~/claude-out`); if you change them, edit `output-styles/verdict.md` and `skills/*/SKILL.md` to match (checkout install only — see [docs/plugin.md](docs/plugin.md)).
 
 ## Skills
 
 - `fresh [scope]` — fresh-eyes review of the session's work or a named scope: weak spots, loose ends, promises the code does not keep.
-- `copilot` — work through Copilot's review comments on the current PR; replies and resolving wait for your approval.
-- `pull [what you expect]` — fast-forward pull on a clean tree, dependency install when the lockfile changed, generator script when the project has one, report.
+- `copilot [PR number]` — work through Copilot's review of a PR (default: the current branch's PR); already-resolved threads are skipped, replies and resolving wait for your approval.
+- `pull [what you expect to have landed]` — fast-forward pull on a clean tree, dependency install when the lockfile changed, a `generate-api` / `generate:api` / `api:generate` / `codegen` script when package.json has one, report.
 
 Called `/fresh` from a checkout, `/verdict:fresh` from the plugin, `$fresh` in Codex.
 

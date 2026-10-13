@@ -14,7 +14,8 @@ function frontmatter(file) {
   const fields = {};
   for (const line of match[1].split('\n')) {
     const idx = line.indexOf(':');
-    fields[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+    const value = line.slice(idx + 1).trim();
+    fields[line.slice(0, idx).trim()] = value.replace(/^"(.*)"$/, '$1');
   }
   return { fields, body: match[2] };
 }
@@ -32,28 +33,57 @@ test('verdict output style: frontmatter and the budget rule', () => {
   assert.match(body, /not a shell command/);
 });
 
-test('skills: frontmatter name matches the directory, bodies carry the owner wording', () => {
-  const expectations = {
-    fresh: { argument: true, phrase: 'fresh eyes' },
-    copilot: { argument: false, phrase: 'Copilot' },
-    pull: { argument: true, phrase: 'generate-api' },
-  };
-  for (const [name, expected] of Object.entries(expectations)) {
-    const { fields, body } = frontmatter(path.join(ROOT, 'skills', name, 'SKILL.md'));
+const SKILLS = {
+  fresh: { hint: '[scope]', phrase: 'fresh eyes' },
+  copilot: { hint: '[PR number]', phrase: 'Copilot' },
+  pull: { hint: '[what you expect to have landed]', phrase: 'generate-api' },
+};
+
+test('skills: frontmatter follows the Claude Code reference, bodies carry the owner wording', () => {
+  for (const [name, expected] of Object.entries(SKILLS)) {
+    const file = path.join(ROOT, 'skills', name, 'SKILL.md');
+    const text = fs.readFileSync(file, 'utf8');
+    const { fields, body } = frontmatter(file);
     assert.equal(fields.name, name);
-    assert.ok(fields.description.length > 0, `${name}: description`);
+    assert.ok(fields.description.length > 0 && fields.description.length <= 1024, `${name}: description within the documented limit`);
+    assert.doesNotMatch(fields.description, /Usage:|\/[a-z]+ \[/, `${name}: arguments belong in argument-hint, not in the description`);
+    assert.equal(fields['argument-hint'], expected.hint, `${name}: argument-hint`);
+    assert.match(text, /^argument-hint: "\[[^\]]+\]"$/m, `${name}: argument-hint stays quoted; an unquoted [..] is a YAML list`);
     assert.equal(fields['disable-model-invocation'], 'true', `${name}: user-invoked only`);
-    assert.equal(body.includes('$ARGUMENTS'), expected.argument, `${name}: $ARGUMENTS`);
+    assert.ok(body.includes('$ARGUMENTS'), `${name}: $ARGUMENTS`);
+    assert.match(body, /placeholder[^.]*my message/, `${name}: Codex leaves the placeholder in place, so the argument is then taken from the message`);
     assert.ok(body.includes(expected.phrase), `${name}: phrase "${expected.phrase}"`);
+    assert.ok(body.length < 3600, `${name}: body is ${body.length} chars; it is loaded on every invocation, keep it lean`);
   }
   assert.equal(fs.existsSync(path.join(ROOT, 'skills', 'odstup')), false, 'old odstup skill removed');
   assert.equal(fs.existsSync(path.join(ROOT, 'skills', 'pullnul')), false, 'old pullnul skill removed');
 });
 
-test('skills: Codex metadata keeps every skill user-invoked only', () => {
-  for (const name of ['fresh', 'copilot', 'pull']) {
+// Exactly the read-only git and gh calls each body runs, plus the fast-forward pull and the
+// submodule checkout. Installs run arriving code, gh api can write, commit and push change
+// history: those keep prompting. (git diff/log/show accept --output=<file>; accepted — a
+// review has no reason to write, and the model would have to ask for that flag on purpose.)
+const ALLOWED_TOOLS = {
+  fresh: 'Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git show *)',
+  copilot: 'Bash(gh pr view *)',
+  pull: 'Bash(git rev-parse *) Bash(git status *) Bash(git pull --ff-only) Bash(git log *) Bash(git diff *) Bash(git submodule update --init)',
+};
+
+test('skills: pre-approved commands are exactly the read-only calls each body runs, plus the fast-forward pull', () => {
+  for (const [name, rules] of Object.entries(ALLOWED_TOOLS)) {
+    const { fields } = frontmatter(path.join(ROOT, 'skills', name, 'SKILL.md'));
+    assert.equal(fields['allowed-tools'], rules, name);
+  }
+});
+
+test('skills: Codex metadata names each skill for the Codex app and keeps it user-invoked only', () => {
+  for (const name of Object.keys(SKILLS)) {
     const meta = fs.readFileSync(path.join(ROOT, 'skills', name, 'agents', 'openai.yaml'), 'utf8');
-    assert.match(meta, /allow_implicit_invocation:\s*false/, `${name}: Codex must not start this skill on its own`);
+    assert.match(
+      meta,
+      /^interface:\n {2}display_name: "[^"\n]+"\n {2}short_description: "[^"\n]{1,72}"\npolicy:\n {2}allow_implicit_invocation: false\n$/,
+      `${name}: openai.yaml has the documented interface/policy shape, a short description under 72 chars and no implicit invocation`,
+    );
   }
 });
 
@@ -67,6 +97,10 @@ test('/pull is generic: only the cwd repository, clean tree, fast-forward only, 
   assert.match(body, /git rev-parse --abbrev-ref @\{u\}/);
   assert.match(body, /--untracked-files=no/);
   assert.doesNotMatch(body, /ORIG_HEAD/, 'the pulled range is anchored on a recorded HEAD, not on ORIG_HEAD');
+  assert.match(body, /shell variables do not survive/, 'the recorded SHA is written into later commands, a $variable would be empty there');
+  assert.match(body, /git log --oneline <sha>\.\.HEAD/);
+  assert.match(body, /git diff --name-only <sha> HEAD/);
+  assert.match(body, /between the cwd and the repository root/, 'the generator lookup stays inside this repository');
   assert.doesNotMatch(body, /git fetch origin/, 'pull fetches by itself; the remote may not be called origin');
   assert.match(body, /Never stash, reset or check out another branch/);
   assert.match(body, /pnpm install/);
@@ -88,6 +122,9 @@ test('/fresh defines severity, lists what was checked and stays in scope', () =>
   assert.match(body, /code, configuration, docs, migrations/);
   assert.match(body, /git diff HEAD/);
   assert.match(body, /nothing changed/);
+  assert.match(body, /change no project file/, 'a review changes nothing but its own report');
+  assert.match(body, /read every `\?\?` file/, 'untracked files are part of the review; git diff HEAD does not show them');
+  assert.match(body, /Report what you verified/, 'no speculative findings');
 });
 
 test('community files exist and the issue templates ask which agent is affected', () => {
@@ -139,9 +176,23 @@ test('verdict output style applies automatically when installed as a plugin', ()
   assert.equal(fields['force-for-plugin'], 'true');
 });
 
-test('/copilot matches the Copilot login ignoring case and resolves threads only after approval', () => {
+test('/copilot reads review threads, skips resolved ones, knows both bot logins and resolves only after approval', () => {
   const { body } = frontmatter(path.join(ROOT, 'skills', 'copilot', 'SKILL.md'));
+  assert.match(body, /reviewThreads\(first: 100\) \{ pageInfo \{ hasNextPage endCursor \}/, 'threads come from GraphQL, which carries the resolution state, and are paged');
+  assert.match(body, /isResolved/);
+  assert.match(body, /reviews --paginate/, 'review summaries are paged too');
+  assert.match(body, /"Suppressed comments \(N\)"/, 'the section Copilot uses for comments it did not post as threads');
+  // Checked on 2026-10-13 against live responses: GraphQL reports the bot as
+  // copilot-pull-request-reviewer, REST review comments as Copilot, REST reviews as
+  // copilot-pull-request-reviewer[bot]. If GitHub renames it, the skill lists the logins it saw.
+  assert.match(body, /`copilot-pull-request-reviewer`/);
+  assert.match(body, /`Copilot`/);
+  assert.match(body, /`copilot-pull-request-reviewer\[bot\]`/);
   assert.match(body, /ignoring case/);
+  assert.match(body, /list the logins you saw and stop/);
+  assert.match(body, /git branch --show-current/, 'an explicit PR number is checked against the checked-out branch');
+  assert.match(body, /say so and stop/, 'no PR or nothing to do ends the skill');
+  assert.match(body, /Do not commit or push/);
   const approval = body.indexOf('wait for approval');
   const resolve = body.indexOf('resolveReviewThread');
   assert.ok(approval > -1 && resolve > approval, 'threads are resolved after the approval step');
