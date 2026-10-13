@@ -63,40 +63,82 @@ test('install links every file, registers hooks, is idempotent, uninstall remove
   assert.equal(after.outputStyle, undefined);
 });
 
-test('--codex installs hooks.json, the AGENTS.md block and skills under CODEX_HOME; uninstall reverts; Claude files untouched', (t) => {
+function codexBox() {
   const box = sandbox();
-  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
-  const codexHome = path.join(box.root, 'codex');
-  const runCodex = (args = []) => spawnSync('bash', [INSTALL, '--codex', ...args], {
+  box.codexHome = path.join(box.root, 'codex');
+  box.skillsDir = path.join(box.root, 'agents', 'skills');
+  box.run = (args = []) => spawnSync('bash', [INSTALL, '--codex', ...args], {
     encoding: 'utf8',
-    env: { ...process.env, CLAUDE_CONFIG_DIR: box.claudeDir, VERDICT_CONFIG_DIR: box.configDir, CODEX_HOME: codexHome },
+    env: {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: box.claudeDir,
+      VERDICT_CONFIG_DIR: box.configDir,
+      CODEX_HOME: box.codexHome,
+      VERDICT_AGENTS_SKILLS_DIR: box.skillsDir,
+      VERDICT_STATE_DIR: path.join(box.root, 'state'),
+    },
   });
+  return box;
+}
 
-  const first = runCodex();
+test('--codex installs hooks.json, the AGENTS.md block with the absolute outDir and skills; uninstall removes exactly that', (t) => {
+  const box = codexBox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  fs.mkdirSync(box.configDir, { recursive: true });
+  fs.writeFileSync(path.join(box.configDir, 'budget.json'), JSON.stringify({ outDir: path.join(box.root, 'out') }));
+
+  const first = box.run();
   assert.equal(first.status, 0, first.stderr);
-  const hooks = JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'));
+  const hooks = JSON.parse(fs.readFileSync(path.join(box.codexHome, 'hooks.json'), 'utf8'));
   assert.deepEqual(Object.keys(hooks.hooks), ['UserPromptSubmit', 'PostToolUse', 'Stop']);
   assert.equal(hooks.hooks.Stop[0].hooks[0].command, `node "${path.join(ROOT, 'hooks', 'budget-stop.js')}"`);
   assert.equal(hooks.outputStyle, undefined);
-  const agents = fs.readFileSync(path.join(codexHome, 'AGENTS.md'), 'utf8');
+  const agents = fs.readFileSync(path.join(box.codexHome, 'AGENTS.md'), 'utf8');
   assert.match(agents, /<!-- verdict:start -->[\s\S]*# Terminal budget[\s\S]*<!-- verdict:end -->/);
+  assert.ok(agents.includes(`${path.join(box.root, 'out')}/<project>/`), 'the block names the absolute outDir from budget.json');
+  assert.doesNotMatch(agents, /~\/claude-out/);
   for (const name of ['fresh', 'copilot', 'pull']) {
-    assert.equal(fs.readlinkSync(path.join(codexHome, 'skills', name)), path.join(ROOT, 'skills', name));
+    assert.equal(fs.readlinkSync(path.join(box.skillsDir, name)), path.join(ROOT, 'skills', name));
   }
+  assert.equal(fs.existsSync(path.join(box.codexHome, 'skills')), false, 'skills go to ~/.agents/skills, not the deprecated ~/.codex/skills');
   assert.equal(fs.existsSync(box.claudeDir), false, 'the Claude side is untouched');
   assert.match(first.stdout, /\/hooks/);
+  assert.match(first.stdout, /writable_roots/);
 
-  const second = runCodex();
+  const second = box.run();
   assert.equal(second.status, 0, second.stderr);
   assert.match(second.stdout, /settings unchanged/);
 
-  const removed = runCodex(['--uninstall']);
+  const removed = box.run(['--uninstall']);
   assert.equal(removed.status, 0, removed.stderr);
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8')), {});
-  assert.doesNotMatch(fs.readFileSync(path.join(codexHome, 'AGENTS.md'), 'utf8'), /verdict:start/);
+  assert.equal(fs.existsSync(path.join(box.codexHome, 'hooks.json')), false, 'an empty hooks.json we created is removed');
+  assert.equal(fs.existsSync(path.join(box.codexHome, 'AGENTS.md')), false, 'an AGENTS.md that held only our block is removed');
   for (const name of ['fresh', 'copilot', 'pull']) {
-    assert.equal(fs.existsSync(path.join(codexHome, 'skills', name)), false);
+    assert.equal(fs.existsSync(path.join(box.skillsDir, name)), false);
   }
+});
+
+test('--codex keeps other people\'s hooks and AGENTS.md text on uninstall', (t) => {
+  const box = codexBox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  fs.mkdirSync(box.codexHome, { recursive: true });
+  fs.writeFileSync(path.join(box.codexHome, 'AGENTS.md'), '# Mine\n\nkeep me\n');
+  fs.writeFileSync(path.join(box.codexHome, 'hooks.json'), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'node other.js' }] }] } }));
+  assert.equal(box.run().status, 0);
+  assert.equal(box.run(['--uninstall']).status, 0);
+  assert.equal(fs.readFileSync(path.join(box.codexHome, 'AGENTS.md'), 'utf8'), '# Mine\n\nkeep me\n');
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(box.codexHome, 'hooks.json'), 'utf8')), { hooks: { Stop: [{ hooks: [{ type: 'command', command: 'node other.js' }] }] } });
+});
+
+test('--codex links skills before touching hooks.json or AGENTS.md, so a conflict changes nothing', (t) => {
+  const box = codexBox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(box.skillsDir, 'pull'), { recursive: true });
+  const result = box.run();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /refusing: .*pull exists and is not a symlink/);
+  assert.equal(fs.existsSync(path.join(box.codexHome, 'hooks.json')), false);
+  assert.equal(fs.existsSync(path.join(box.codexHome, 'AGENTS.md')), false);
 });
 
 test('install refuses to replace a real file at a target path', (t) => {

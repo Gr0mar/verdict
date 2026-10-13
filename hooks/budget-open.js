@@ -27,15 +27,17 @@ function resolveOutFile(filePath, outDir) {
   }
 }
 
-// Codex edits files through apply_patch; the patch names each file it adds or updates.
-const PATCH_FILE_LINE = /^\*\*\* (?:Add|Update) File: (.+?)\s*$/gm;
+// Codex edits files through apply_patch; the patch names each file it adds, updates or
+// renames to. Codex accepts indented headers, so the regex does too.
+const PATCH_FILE_LINE = /^\s*\*\*\* (?:Add File|Update File|Move to): (.+?)\s*$/gm;
 
 function patchedPaths(command, cwd) {
-  if (typeof command !== 'string' || typeof cwd !== 'string') return [];
+  if (typeof command !== 'string') return [];
   const paths = [];
   for (const match of command.matchAll(PATCH_FILE_LINE)) {
     const file = match[1];
-    paths.push(path.isAbsolute(file) ? file : path.resolve(cwd, file));
+    if (path.isAbsolute(file)) paths.push(file);
+    else if (typeof cwd === 'string') paths.push(path.resolve(cwd, file));
   }
   return paths;
 }

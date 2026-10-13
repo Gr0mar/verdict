@@ -8,7 +8,8 @@
 //   --target codex:            ~/.codex/hooks.json — hooks only (Codex has no output styles)
 //
 // Usage:
-//   node install/merge-settings.js --settings <path> --hooks-dir <path> --install-state <path> [--target claude|codex] [--uninstall]
+//   node install/merge-settings.js --settings <path> --hooks-dir <path> [--install-state <path>] [--target claude|codex] [--uninstall]
+//   (--install-state is required for --target claude)
 
 const fs = require('fs');
 const path = require('path');
@@ -24,7 +25,7 @@ const HOOK_EVENTS = [
 ];
 
 const FLAGS = { '--settings': 'settings', '--hooks-dir': 'hooksDir', '--install-state': 'installState', '--target': 'target' };
-const USAGE = 'usage: --settings <path> --hooks-dir <path> --install-state <path> [--target claude|codex] [--uninstall]';
+const USAGE = 'usage: --settings <path> --hooks-dir <path> [--install-state <path>] [--target claude|codex] [--uninstall]';
 
 function hookCommand(hooksDir, script) {
   return `node "${path.join(hooksDir, script)}"`;
@@ -119,10 +120,12 @@ function parseArgs(argv) {
     args[key] = argv[i + 1];
     i += 1;
   }
-  for (const key of ['settings', 'hooksDir', 'installState']) {
+  if (!TARGETS.includes(args.target)) throw new Error(`unknown target "${args.target}" — ${USAGE}`);
+  // Codex remembers nothing between install and uninstall, so it needs no install state.
+  const required = args.target === 'codex' ? ['settings', 'hooksDir'] : ['settings', 'hooksDir', 'installState'];
+  for (const key of required) {
     if (!args[key]) throw new Error(USAGE);
   }
-  if (!TARGETS.includes(args.target)) throw new Error(`unknown target "${args.target}" — ${USAGE}`);
   return args;
 }
 

@@ -114,7 +114,8 @@ test('CLI --target codex: hooks only, no outputStyle, no install state; uninstal
   const dir = tmpDir();
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const hooksFile = path.join(dir, 'hooks.json');
-  const args = ['--target', 'codex', '--settings', hooksFile, '--hooks-dir', HOOKS_DIR, '--install-state', path.join(dir, 'install-state.json')];
+  // No --install-state: Codex has nothing to remember between install and uninstall.
+  const args = ['--target', 'codex', '--settings', hooksFile, '--hooks-dir', HOOKS_DIR];
   assert.equal(run(args).status, 0);
   const hooks = readJson(hooksFile);
   assert.equal(hooks.outputStyle, undefined);

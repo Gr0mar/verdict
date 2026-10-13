@@ -28,7 +28,8 @@ test('verdict output style: frontmatter and the budget rule', () => {
   assert.match(body, /900 characters/);
   assert.match(body, /~\/claude-out\/<project>\/<YYYY-MM-DD>-<slug>\.md/);
   assert.match(body, /as a Markdown file/);
-  assert.doesNotMatch(body, /Write tool/, 'the rule names no agent-specific tool: Codex writes through apply_patch');
+  assert.match(body, /Claude Code: the Write tool; Codex: apply_patch/, 'the rule names the writes the hook can see');
+  assert.match(body, /not a shell command/);
 });
 
 test('skills: frontmatter name matches the directory, bodies carry the owner wording', () => {
@@ -47,6 +48,13 @@ test('skills: frontmatter name matches the directory, bodies carry the owner wor
   }
   assert.equal(fs.existsSync(path.join(ROOT, 'skills', 'odstup')), false, 'old odstup skill removed');
   assert.equal(fs.existsSync(path.join(ROOT, 'skills', 'pullnul')), false, 'old pullnul skill removed');
+});
+
+test('skills: Codex metadata keeps every skill user-invoked only', () => {
+  for (const name of ['fresh', 'copilot', 'pull']) {
+    const meta = fs.readFileSync(path.join(ROOT, 'skills', name, 'agents', 'openai.yaml'), 'utf8');
+    assert.match(meta, /allow_implicit_invocation:\s*false/, `${name}: Codex must not start this skill on its own`);
+  }
 });
 
 test('/pull is generic: only the cwd repository, clean tree, fast-forward only, deps by lockfile, no internal tooling', () => {

@@ -4,7 +4,7 @@
 [![licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 ![Node 22+](https://img.shields.io/badge/node-22%2B-lightgrey)
 
-A terminal budget for [Claude Code](https://code.claude.com) and [Codex](https://developers.openai.com/codex). The output style asks for replies within **12 lines / 900 characters** — the verdict first, up to three bullets, done — with anything longer (a code review, a research summary, a design proposal, a message you will forward) written to a Markdown file under `~/claude-out/` that opens in your editor by itself. A Stop hook measures every final reply; when one is over budget and no file was written, Claude is sent back once to move the content to a file and answer briefly.
+A terminal budget for [Claude Code](https://code.claude.com) and [Codex](https://developers.openai.com/codex). The output style asks for replies within **12 lines / 900 characters** — the verdict first, up to three bullets, done — with anything longer (a code review, a research summary, a design proposal, a message you will forward) written to a Markdown file under `~/claude-out/` that opens in your editor by itself. A Stop hook measures every final reply; when one is over budget and no file was written, the agent is sent back once to move the content to a file and answer briefly.
 
 ![Without: a 75-line review in the terminal. With the terminal budget: a three-line verdict in the terminal and the full review open in the editor.](docs/demo.svg)
 
@@ -34,7 +34,7 @@ What the hook cannot do: take text back. It runs after the reply is on screen, s
 ## Requirements
 
 - Claude Code **2.1.143 or newer** (the Stop hook's `last_assistant_message` field and the cap on hook continuations). On older 2.1 releases the hook sees no reply text, logs `allow_empty` and enforces nothing.
-- Or Codex CLI with lifecycle hooks (0.114 or newer; hooks are on by default). The same three scripts run there — Codex's hook events and fields match.
+- Or Codex **0.124.0 or newer** (stable lifecycle hooks, on by default, with `apply_patch` visible to PostToolUse). The same three scripts run there — Codex's hook events and fields match.
 - Node 22 or newer. No npm dependencies.
 - An opener: macOS uses `open -a <openApp>` (default Cursor); other systems default to `xdg-open`. Set `openCommand` for anything else.
 
@@ -60,11 +60,17 @@ cd ~/verdict
 
 **Claude Code:** `install.sh` symlinks the hooks, the output style and the skills into `~/.claude/` and registers the hooks plus `"outputStyle": "verdict"` in `~/.claude/settings.json` — the file is rewritten after a backup, the merge is idempotent, and no other file is touched: a target that already exists and is not our symlink aborts the install. Restart Claude Code afterwards: hooks reload into running sessions, the output style is read at startup.
 
-**Codex:** `install.sh --codex` registers the hooks in `~/.codex/hooks.json` (pointing at this checkout), puts the rule into `~/.codex/AGENTS.md` between `<!-- verdict:start -->` and `<!-- verdict:end -->` markers (Codex has no output styles; the rest of the file is left alone), and links the skills into `~/.codex/skills/`. The rule alone already works in the Codex desktop app: replies come as a verdict with a link to the full file. The hooks add enforcement and the automatic opening, and Codex skips hooks it has not been told to trust — run `/hooks` in the CLI once and trust the three verdict hooks.
+**Codex:** `install.sh --codex` registers the hooks in `~/.codex/hooks.json` (pointing at this checkout), puts the rule into `~/.codex/AGENTS.md` between `<!-- verdict:start -->` and `<!-- verdict:end -->` markers with the absolute output directory filled in (Codex has no output styles and `apply_patch` does not expand `~`; the rest of the file is left alone — re-run the install after editing `output-styles/verdict.md`, the block is a copy), and links the skills into `~/.agents/skills/`. Then:
+
+- restart Codex — `AGENTS.md` is read at startup, and an `AGENTS.override.md` next to it would hide the rule;
+- let Codex write outside the repository: add the output directory to `[sandbox_workspace_write] writable_roots` in `~/.codex/config.toml` (the installer prints the exact lines), or approve the write when Codex asks;
+- optional, for enforcement and automatic opening: run `/hooks` in the Codex CLI and trust the three verdict hooks — Codex skips untrusted hooks, and trust is per hook hash, so repeat it after updating the checkout.
+
+Verified so far: in the Codex desktop app the rule alone produces a verdict plus a link to the full file. The hooks have not yet been run in a live Codex session (CLI or app) — reports welcome. In Codex the skills are invoked as `$fresh`, `$copilot`, `$pull` (or via `/skills`), their `$ARGUMENTS` placeholder is not substituted (the model sees the literal text), and each ships `agents/openai.yaml` so Codex never starts them on its own.
 
 ```sh
 ./install.sh --uninstall           # Claude Code: removes the symlinks and hook entries, restores the outputStyle active at install time
-./install.sh --codex --uninstall   # Codex: removes the hook entries, the AGENTS.md block and the skill links
+./install.sh --codex --uninstall   # Codex: removes the hook entries, the AGENTS.md block and the skill links (and the files if nothing else is left in them)
 ```
 
 ## Asking for the full text
@@ -74,7 +80,7 @@ Say so in the prompt and the budget is lifted for that one turn:
 - English: `elaborate`, `in detail`, `in full`, `verbatim`, `show me everything`, `paste it here`, `show me the code`, `give me the command`, `show me the full output`, `print the whole thing`, `put it in the terminal`, `verbose`
 - Czech: `rozveď`, `podrobně`, `do terminálu`, `vypiš celé`, `ukaž mi kód`, `dej mi ten příkaz`
 
-The pattern matches request phrases, not bare words: `detail view`, `full width`, `show all toggle`, `--verbose flag` or `code review of the whole branch` do not lift the budget. It is a configurable regex (`detailPattern`); words inside pasted content are ignored. The output style also tells Claude to keep security warnings, confirmations of destructive actions and requested code in the terminal — but the hook measures those replies like any other, so ask with one of the phrases above when such a reply will be long.
+The pattern matches request phrases, not bare words: `detail view`, `full width`, `show all toggle`, `--verbose flag` or `code review of the whole branch` do not lift the budget. It is a configurable regex (`detailPattern`); in Claude Code, words inside pasted content are ignored (Codex pastes text inline, so there they count). The output style also tells the agent to keep security warnings, confirmations of destructive actions and requested code in the terminal — but the hook measures those replies like any other, so ask with one of the phrases above when such a reply will be long.
 
 ## Configuration
 
@@ -89,9 +95,9 @@ The pattern matches request phrases, not bare words: `detail view`, `full width`
 | `openCommand` | `["open", "-a", "Cursor"]` on macOS, `["xdg-open"]` elsewhere | JSON array: executable plus arguments, the file path is appended; `~` is not expanded in the executable |
 | `detailPattern` | request phrases, English + Czech | case-insensitive regex that lifts the budget for one turn |
 
-Files land in `<outDir>/<project>/<YYYY-MM-DD>-<slug>.md`, where `<project>` is the basename of Claude's working directory.
+Files land in `<outDir>/<project>/<YYYY-MM-DD>-<slug>.md`, where `<project>` is the basename of the agent's working directory.
 
-The output style and the skills carry the defaults in their text (`12 lines`, `900 characters`, `~/claude-out`). When you change `maxLines`, `maxChars` or `outDir`, edit `output-styles/verdict.md` and `skills/*/SKILL.md` to match — the hook enforces the config, the style tells Claude what to aim for.
+The output style and the skills carry the defaults in their text (`12 lines`, `900 characters`, `~/claude-out`). When you change `maxLines`, `maxChars` or `outDir`, edit `output-styles/verdict.md` and `skills/*/SKILL.md` to match (and re-run `install.sh --codex`, which copies the rule into `AGENTS.md`) — the hook enforces the config, the style tells the agent what to aim for. The configuration, the state and the log live in the same places for Claude Code and Codex.
 
 ## Log and metrics
 
@@ -123,7 +129,7 @@ Three slash commands for prompts people type again and again. Each is a plain `S
 - Only the final message of a turn is measured; narration between tool calls is not, and the retry after a block is not measured again.
 - Lines are counted on `\n`, not on rendered height; the character budget bounds wrapping.
 - Files are detected through Claude Code's `Write` tool and Codex's `apply_patch`; a file produced by a shell command is not opened.
-- The hooks run through symlinks into this checkout, so an edit here is live in every session immediately. They fail open: on any internal error a hook exits 0 and prints nothing.
+- With the checkout install the hooks run from this checkout (symlinks for Claude Code, direct paths for Codex), so an edit here is live in every session immediately. They fail open: on any internal error a hook exits 0 and prints nothing.
 
 ## Development
 
