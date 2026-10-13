@@ -59,8 +59,26 @@ function readLog(sandbox) {
   return fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
 }
 
-function cleanup(sandbox) {
-  fs.rmSync(sandbox.root, { recursive: true, force: true });
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-module.exports = { HOOKS_DIR, makeSandbox, writeConfig, env, runHook, readState, readLog, cleanup };
+// The hook starts the open stub detached and exits without waiting for it, so the stub
+// may still create open.log while the tree is being removed; rmSync then fails with
+// ENOTEMPTY (seen on slow CI runners). Removing again picks up the straggler. rmSync's
+// own maxRetries would not: it retries the final rmdir without re-reading the children.
+const RETRY_CODES = new Set(['ENOTEMPTY', 'EBUSY', 'EPERM', 'EMFILE', 'ENFILE']);
+
+function cleanup(sandbox) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      fs.rmSync(sandbox.root, { recursive: true, force: true });
+      return;
+    } catch (e) {
+      if (!RETRY_CODES.has(e.code) || attempt >= 20) throw e;
+      sleep(25);
+    }
+  }
+}
+
+module.exports = { HOOKS_DIR, makeSandbox, writeConfig, env, runHook, readState, readLog, sleep, cleanup };

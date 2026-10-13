@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { makeSandbox, writeConfig, runHook, readState, cleanup } = require('./helpers');
+const { makeSandbox, writeConfig, runHook, readState, sleep, cleanup } = require('./helpers');
 
 const HOOK = 'budget-open.js';
 // Arguments the default open command passes before the file path: `open -a Cursor` on macOS, bare `xdg-open` elsewhere.
@@ -19,24 +19,20 @@ function createFile(filePath) {
   return filePath;
 }
 
+// The stub creates the log before its first write, so an empty file means "nothing yet".
 function openCalls(sandbox) {
   if (!fs.existsSync(sandbox.openLog)) return [];
-  return fs.readFileSync(sandbox.openLog, 'utf8').trim().split('\n');
-}
-
-function sleep(ms) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  return fs.readFileSync(sandbox.openLog, 'utf8').split('\n').filter(Boolean);
 }
 
 // The hook starts the opener detached and exits without waiting for it, so the stub's
-// log may appear a moment after runHook returns.
+// log may appear a moment after runHook returns. Every test that triggers an opener
+// waits for it before it ends; otherwise the stub races the sandbox cleanup. Once the
+// expected lines are there, a short grace period lets a surplus opener show up too.
 function waitForOpenCalls(sandbox, count, timeoutMs = 2000) {
   const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const calls = openCalls(sandbox);
-    if (calls.length >= count) return calls;
-    sleep(20);
-  }
+  while (Date.now() - start < timeoutMs && openCalls(sandbox).length < count) sleep(20);
+  sleep(100);
   return openCalls(sandbox);
 }
 
@@ -98,6 +94,9 @@ test('existing state is preserved, paths are not duplicated', (t) => {
   runHook(HOOK, writeEvent(file), sandbox);
   runHook(HOOK, writeEvent(file), sandbox);
   assert.deepEqual(readState(sandbox, 'sess-1'), { prompt: 'udelej code review', detail: false, written: [fs.realpathSync(file)] });
+  // The file is opened on every write, even when the state already lists it.
+  const calls = waitForOpenCalls(sandbox, 2 * (DEFAULT_ARGS.length + 1));
+  assert.deepEqual([...calls].sort(), [...DEFAULT_ARGS, ...DEFAULT_ARGS, fs.realpathSync(file), fs.realpathSync(file)].sort());
 });
 
 test('files outside outDir are ignored', (t) => {
@@ -194,6 +193,7 @@ test('Codex apply_patch: relative paths need a cwd, absolute paths do not; a non
   assertNotOpened(sandbox);
   runHook(HOOK, patchEvent(`*** Begin Patch\n*** Update File: ${file}\n@@\n+x\n*** End Patch`, undefined), sandbox);
   assert.deepEqual(readState(sandbox, 'sess-1').written, [fs.realpathSync(file)]);
+  assert.deepEqual(waitForOpenCalls(sandbox, DEFAULT_ARGS.length + 1), [...DEFAULT_ARGS, fs.realpathSync(file)]);
 });
 
 test('Codex apply_patch: a rename into outDir and indented headers are detected', (t) => {
@@ -204,6 +204,8 @@ test('Codex apply_patch: a rename into outDir and indented headers are detected'
   const command = `*** Begin Patch\n*** Update File: notes/draft.md\n*** Move to: claude-out/p/moved.md\n@@\n+x\n   *** Add File: claude-out/p/added.md\n+y\n*** End Patch`;
   runHook(HOOK, patchEvent(command, sandbox.root), sandbox);
   assert.deepEqual(readState(sandbox, 'sess-1').written, [fs.realpathSync(moved), fs.realpathSync(added)]);
+  const calls = waitForOpenCalls(sandbox, 2 * (DEFAULT_ARGS.length + 1));
+  assert.deepEqual([...calls].sort(), [...DEFAULT_ARGS, fs.realpathSync(moved), ...DEFAULT_ARGS, fs.realpathSync(added)].sort());
 });
 
 test('malformed stdin or missing tool_input: exit 0, no stdout', (t) => {
