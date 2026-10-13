@@ -71,7 +71,7 @@ The style text and the three skills carry the defaults (`12 lines`, `~/claude-ou
 ## Skills
 
 - `fresh [scope]` — fresh-eyes review of the uncommitted changes or a named scope, run in a separate read-only agent so the context that wrote the code does not grade it: weak spots by severity, open questions, nothing changed.
-- `copilot [PR number]` — work through Copilot's review of a PR (default: the current branch's PR); already-resolved threads are skipped, replies and resolving wait for your approval.
+- `copilot [PR number]` — work through Copilot's review of a PR (default: the current branch's PR); already-resolved threads are skipped, and the push, the replies and the resolving wait for your approval.
 - `pull [what you expect to have landed]` — fast-forward pull on a clean tree, dependency install when the lockfile changed, a `generate-api` / `generate:api` / `api:generate` / `codegen` script when package.json has one, report.
 
 Called `/fresh` from a checkout, `/verdict:fresh` from the plugin, `$fresh` in Codex.

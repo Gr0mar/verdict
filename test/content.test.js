@@ -65,7 +65,7 @@ test('skills: frontmatter follows the Claude Code reference, bodies carry the ow
 // review has no reason to write, and the model would have to ask for that flag on purpose.)
 const ALLOWED_TOOLS = {
   fresh: 'Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git show *)',
-  copilot: 'Bash(gh pr view *)',
+  copilot: 'Bash(gh pr view *) Bash(git branch --show-current) Bash(git rev-parse *)',
   pull: 'Bash(git rev-parse *) Bash(git status *) Bash(git pull --ff-only) Bash(git log *) Bash(git diff *) Bash(git submodule update --init)',
 };
 
@@ -198,10 +198,26 @@ test('verdict output style applies automatically when installed as a plugin', ()
 
 test('/copilot reads review threads, skips resolved ones, knows both bot logins and resolves only after approval', () => {
   const { body } = frontmatter(path.join(ROOT, 'skills', 'copilot', 'SKILL.md'));
-  assert.match(body, /reviewThreads\(first: 100\) \{ pageInfo \{ hasNextPage endCursor \}/, 'threads come from GraphQL, which carries the resolution state, and are paged');
-  assert.match(body, /isResolved/);
+  assert.match(body, /gh api graphql --paginate /, 'gh pages the query itself');
+  assert.match(body, /\$endCursor: String\) \{/, 'the variable --paginate needs');
+  assert.match(body, /reviewThreads\(first: 100, after: \$endCursor\) \{ pageInfo \{ hasNextPage endCursor \}/, 'threads come from GraphQL, which carries the resolution state');
+  assert.match(body, /isResolved isOutdated path line originalLine/, 'outdated threads have line: null, originalLine is what is left');
+  assert.match(body, /author \{ login __typename \}/, 'a person and a bot are told apart by type, not by the login spelling');
   assert.match(body, /reviews --paginate/, 'review summaries are paged too');
-  assert.match(body, /"Suppressed comments \(N\)"/, 'the section Copilot uses for comments it did not post as threads');
+  assert.match(body, /"Suppressed comments \(N\)"/, 'the section Copilot uses for comments it did not post as threads (seen live on 2026-10-13)');
+  assert.match(body, /"Comments suppressed due to low confidence \(N\)"/, 'the older heading of the same section');
+  assert.match(body, /skip one that a PR comment already quotes/, 'a second run must not raise the same suppressed comment again');
+  assert.match(body, /headRefOid/, 'the checked-out commit must be the PR head, a branch name alone is not enough');
+  assert.match(body, /git rev-parse HEAD/);
+  assert.match(body, /a failure goes into the report/, 'failing tests are reported, not papered over');
+  assert.match(body, /gh pr comment <number> --body/, 'suppressed comments are answered with a named command');
+  assert.match(body, /applied \/ declined \/ asked/, 'the questions waiting on the user are counted too');
+  // Threads are resolved only once the fixes are on the PR: approval → commit and push → replies → resolve.
+  const approval = body.indexOf('wait for approval');
+  const push = body.indexOf('commit the fixes on the PR branch and push');
+  const replies = body.indexOf('/replies');
+  const resolve = body.indexOf('resolveReviewThread');
+  assert.ok(approval > -1 && push > approval && replies > push && resolve > replies, 'order: approval, push, replies, resolve');
   // Checked on 2026-10-13 against live responses: GraphQL reports the bot as
   // copilot-pull-request-reviewer, REST review comments as Copilot, REST reviews as
   // copilot-pull-request-reviewer[bot]. If GitHub renames it, the skill lists the logins it saw.
@@ -212,8 +228,5 @@ test('/copilot reads review threads, skips resolved ones, knows both bot logins 
   assert.match(body, /list the logins you saw and stop/);
   assert.match(body, /git branch --show-current/, 'an explicit PR number is checked against the checked-out branch');
   assert.match(body, /say so and stop/, 'no PR or nothing to do ends the skill');
-  assert.match(body, /Do not commit or push/);
-  const approval = body.indexOf('wait for approval');
-  const resolve = body.indexOf('resolveReviewThread');
-  assert.ok(approval > -1 && resolve > approval, 'threads are resolved after the approval step');
+  assert.match(body, /Do not commit or push yet/);
 });
