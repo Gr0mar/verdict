@@ -70,6 +70,42 @@ test('nothing shipped names a machine-specific path or a specific editor', () =>
   assert.doesNotMatch(style, /Cursor|VS Code/, 'the editor is configuration, not part of the rule');
 });
 
+test('plugin manifests: one repo is the plugin and its own marketplace, versions agree', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  const plugin = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'plugin.json'), 'utf8'));
+  assert.equal(plugin.name, 'verdict');
+  assert.equal(plugin.version, pkg.version);
+  assert.ok(plugin.description.length > 0);
+  const marketplace = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'marketplace.json'), 'utf8'));
+  assert.equal(marketplace.name, 'gr0mar');
+  assert.equal(marketplace.owner.name, 'Gr0mar');
+  assert.deepEqual(marketplace.plugins.map((p) => [p.name, p.source, p.version]), [['verdict', './', pkg.version]]);
+});
+
+test('plugin hooks.json: the three events point at the bundled scripts through CLAUDE_PLUGIN_ROOT', () => {
+  const { hooks } = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks', 'hooks.json'), 'utf8'));
+  assert.deepEqual(Object.keys(hooks), ['UserPromptSubmit', 'PostToolUse', 'Stop']);
+  const expected = { UserPromptSubmit: 'budget-prompt.js', PostToolUse: 'budget-open.js', Stop: 'budget-stop.js' };
+  for (const [event, script] of Object.entries(expected)) {
+    assert.equal(hooks[event].length, 1, event);
+    const [group] = hooks[event];
+    assert.equal(group.hooks.length, 1, event);
+    const [hook] = group.hooks;
+    assert.equal(hook.type, 'command');
+    assert.equal(hook.command, `node "\${CLAUDE_PLUGIN_ROOT}/hooks/${script}"`);
+    assert.equal(hook.timeout, 5);
+    assert.ok(fs.existsSync(path.join(ROOT, 'hooks', script)), `${script} exists`);
+  }
+  assert.equal(hooks.PostToolUse[0].matcher, 'Write|apply_patch');
+  assert.equal(hooks.UserPromptSubmit[0].matcher, undefined);
+  assert.equal(hooks.Stop[0].matcher, undefined);
+});
+
+test('verdict output style applies automatically when installed as a plugin', () => {
+  const { fields } = frontmatter(path.join(ROOT, 'output-styles', 'verdict.md'));
+  assert.equal(fields['force-for-plugin'], 'true');
+});
+
 test('/copilot matches the Copilot login ignoring case and resolves threads only after approval', () => {
   const { body } = frontmatter(path.join(ROOT, 'skills', 'copilot', 'SKILL.md'));
   assert.match(body, /ignoring case/);

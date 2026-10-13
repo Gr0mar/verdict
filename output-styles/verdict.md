@@ -2,6 +2,7 @@
 name: verdict
 description: Verdict first; anything longer than 12 lines goes to a Markdown file under ~/claude-out that opens in your editor
 keep-coding-instructions: true
+force-for-plugin: true
 ---
 
 # Terminal budget

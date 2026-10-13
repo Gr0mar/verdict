@@ -1,0 +1,13 @@
+{
+  "name": "verdict",
+  "version": "0.2.0",
+  "description": "A terminal budget for Claude Code: verdict first, long content to a Markdown file that opens in your editor, measured by a Stop hook",
+  "author": {
+    "name": "Gr0mar",
+    "url": "https://github.com/Gr0mar"
+  },
+  "homepage": "https://github.com/Gr0mar/verdict",
+  "repository": "https://github.com/Gr0mar/verdict",
+  "license": "MIT",
+  "keywords": ["terminal", "output", "hooks", "productivity", "verdict"]
+}

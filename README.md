@@ -40,6 +40,17 @@ What the hook cannot do: take text back. It runs after the reply is on screen, s
 
 ## Install
 
+**Claude Code, as a plugin** (recommended — two commands, nothing to clone):
+
+```
+/plugin marketplace add Gr0mar/verdict
+/plugin install verdict@gr0mar
+```
+
+The plugin bundles the hooks, the output style (applied automatically while the plugin is enabled) and the skills, which run as `/verdict:fresh`, `/verdict:copilot` and `/verdict:pull`. `/plugin uninstall verdict@gr0mar` removes everything. Pick one method: the plugin or the checkout below, not both — otherwise every hook runs twice.
+
+**From a checkout** (Claude Code via `install.sh`, or Codex):
+
 ```sh
 git clone https://github.com/Gr0mar/verdict.git ~/verdict
 cd ~/verdict
@@ -49,7 +60,7 @@ cd ~/verdict
 
 **Claude Code:** `install.sh` symlinks the hooks, the output style and the skills into `~/.claude/` and registers the hooks plus `"outputStyle": "verdict"` in `~/.claude/settings.json` — the file is rewritten after a backup, the merge is idempotent, and no other file is touched: a target that already exists and is not our symlink aborts the install. Restart Claude Code afterwards: hooks reload into running sessions, the output style is read at startup.
 
-**Codex:** `install.sh --codex` registers the hooks in `~/.codex/hooks.json` (pointing at this checkout), puts the rule into `~/.codex/AGENTS.md` between `<!-- verdict:start -->` and `<!-- verdict:end -->` markers (Codex has no output styles; the rest of the file is left alone), and links the skills into `~/.codex/skills/`. Codex skips hooks it has not been told to trust: run `/hooks` in the CLI once and trust the three verdict hooks. Tested against the documented hook contract; please report how it behaves in the desktop app.
+**Codex:** `install.sh --codex` registers the hooks in `~/.codex/hooks.json` (pointing at this checkout), puts the rule into `~/.codex/AGENTS.md` between `<!-- verdict:start -->` and `<!-- verdict:end -->` markers (Codex has no output styles; the rest of the file is left alone), and links the skills into `~/.codex/skills/`. The rule alone already works in the Codex desktop app: replies come as a verdict with a link to the full file. The hooks add enforcement and the automatic opening, and Codex skips hooks it has not been told to trust — run `/hooks` in the CLI once and trust the three verdict hooks.
 
 ```sh
 ./install.sh --uninstall           # Claude Code: removes the symlinks and hook entries, restores the outputStyle active at install time
