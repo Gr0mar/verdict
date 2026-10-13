@@ -29,7 +29,7 @@ function measured(size, config) {
 function noFileReason(size, config, cwd, now) {
   const target = path.join(config.outDir, projectName(cwd), `${localDate(now)}-<slug>.md`);
   return `Terminal budget: the reply has ${measured(size, config)}. ` +
-    `Write the full content with the Write tool to ${target} and reply again: verdict or question first, up to 3 bullets, ` +
+    `Write the full content as a Markdown file to ${target} and reply again: verdict or question first, up to 3 bullets, ` +
     'the file path (<slug>: 2–5 kebab-case words without diacritics).';
 }
 

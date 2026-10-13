@@ -27,7 +27,8 @@ test('verdict output style: frontmatter and the budget rule', () => {
   assert.match(body, /12 lines/);
   assert.match(body, /900 characters/);
   assert.match(body, /~\/claude-out\/<project>\/<YYYY-MM-DD>-<slug>\.md/);
-  assert.match(body, /Write tool/);
+  assert.match(body, /as a Markdown file/);
+  assert.doesNotMatch(body, /Write tool/, 'the rule names no agent-specific tool: Codex writes through apply_patch');
 });
 
 test('skills: frontmatter name matches the directory, bodies carry the owner wording', () => {

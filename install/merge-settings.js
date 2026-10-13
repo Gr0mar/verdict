@@ -1,25 +1,30 @@
 #!/usr/bin/env node
 'use strict';
-// verdict — registers (or removes) the budget hooks and the verdict output style
-// in a Claude Code settings.json. Idempotent: a second run changes nothing.
+// verdict — registers (or removes) the budget hooks in a hooks configuration file.
+// Idempotent: a second run changes nothing.
+//
+//   --target claude (default): ~/.claude/settings.json — hooks plus "outputStyle": "verdict";
+//                              the previous outputStyle is remembered in the install-state file
+//   --target codex:            ~/.codex/hooks.json — hooks only (Codex has no output styles)
 //
 // Usage:
-//   node install/merge-settings.js --settings <path> --hooks-dir <path> --install-state <path> [--uninstall]
+//   node install/merge-settings.js --settings <path> --hooks-dir <path> --install-state <path> [--target claude|codex] [--uninstall]
 
 const fs = require('fs');
 const path = require('path');
 
 const HOOK_TIMEOUT_SECONDS = 5;
 const OUTPUT_STYLE = 'verdict';
+const TARGETS = ['claude', 'codex'];
 
 const HOOK_EVENTS = [
   { event: 'UserPromptSubmit', script: 'budget-prompt.js' },
-  { event: 'PostToolUse', script: 'budget-open.js', matcher: 'Write' },
+  { event: 'PostToolUse', script: 'budget-open.js', matcher: 'Write|apply_patch' },
   { event: 'Stop', script: 'budget-stop.js' },
 ];
 
-const FLAGS = { '--settings': 'settings', '--hooks-dir': 'hooksDir', '--install-state': 'installState' };
-const USAGE = 'usage: --settings <path> --hooks-dir <path> --install-state <path> [--uninstall]';
+const FLAGS = { '--settings': 'settings', '--hooks-dir': 'hooksDir', '--install-state': 'installState', '--target': 'target' };
+const USAGE = 'usage: --settings <path> --hooks-dir <path> --install-state <path> [--target claude|codex] [--uninstall]';
 
 function hookCommand(hooksDir, script) {
   return `node "${path.join(hooksDir, script)}"`;
@@ -37,8 +42,8 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-// New settings object with our hook groups and output style added.
-function mergeSettings(settings, hooksDir) {
+// New object with our hook groups added under `hooks`.
+function mergeHooks(settings, hooksDir) {
   const next = clone(settings || {});
   next.hooks = next.hooks || {};
   for (const { event, script, matcher } of HOOK_EVENTS) {
@@ -50,12 +55,11 @@ function mergeSettings(settings, hooksDir) {
     }
     next.hooks[event] = groups;
   }
-  next.outputStyle = OUTPUT_STYLE;
   return next;
 }
 
-// New settings object with our hook objects removed and outputStyle restored.
-function removeSettings(settings, hooksDir, previousOutputStyle) {
+// New object with our hook objects removed; other hooks in the same groups stay.
+function removeHooks(settings, hooksDir) {
   const next = clone(settings || {});
   const ours = new Set(HOOK_EVENTS.map(({ script }) => hookCommand(hooksDir, script)));
   if (next.hooks) {
@@ -69,6 +73,19 @@ function removeSettings(settings, hooksDir, previousOutputStyle) {
     }
     if (Object.keys(next.hooks).length === 0) delete next.hooks;
   }
+  return next;
+}
+
+// Claude Code: hooks plus the output style.
+function mergeSettings(settings, hooksDir) {
+  const next = mergeHooks(settings, hooksDir);
+  next.outputStyle = OUTPUT_STYLE;
+  return next;
+}
+
+// Claude Code: hooks removed, outputStyle restored.
+function removeSettings(settings, hooksDir, previousOutputStyle) {
+  const next = removeHooks(settings, hooksDir);
   if (next.outputStyle === OUTPUT_STYLE) {
     if (previousOutputStyle === undefined) delete next.outputStyle;
     else next.outputStyle = previousOutputStyle;
@@ -91,7 +108,7 @@ function writeJson(file, value) {
 }
 
 function parseArgs(argv) {
-  const args = { uninstall: false };
+  const args = { uninstall: false, target: 'claude' };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--uninstall') {
       args.uninstall = true;
@@ -102,30 +119,40 @@ function parseArgs(argv) {
     args[key] = argv[i + 1];
     i += 1;
   }
-  for (const key of Object.values(FLAGS)) {
+  for (const key of ['settings', 'hooksDir', 'installState']) {
     if (!args[key]) throw new Error(USAGE);
   }
+  if (!TARGETS.includes(args.target)) throw new Error(`unknown target "${args.target}" — ${USAGE}`);
   return args;
+}
+
+// Codex: hooks only. Nothing else in the file is ours, so nothing else is remembered.
+function nextForCodex(args, settings) {
+  return args.uninstall ? removeHooks(settings, args.hooksDir) : mergeHooks(settings, args.hooksDir);
+}
+
+// Claude Code: hooks plus outputStyle, with the previous style kept in the install state
+// until the uninstall that restores it.
+function nextForClaude(args, settings) {
+  const installState = readJson(args.installState, {});
+  if (args.uninstall) {
+    const next = removeSettings(settings, args.hooksDir, installState.previousOutputStyle);
+    if ('previousOutputStyle' in installState) {
+      const { previousOutputStyle, ...rest } = installState;
+      writeJson(args.installState, rest);
+    }
+    return next;
+  }
+  if (settings.outputStyle !== OUTPUT_STYLE && !('previousOutputStyle' in installState)) {
+    writeJson(args.installState, { ...installState, previousOutputStyle: settings.outputStyle });
+  }
+  return mergeSettings(settings, args.hooksDir);
 }
 
 function main(argv) {
   const args = parseArgs(argv);
   const settings = readJson(args.settings, {});
-  const installState = readJson(args.installState, {});
-  let next;
-  if (args.uninstall) {
-    next = removeSettings(settings, args.hooksDir, installState.previousOutputStyle);
-    // The restored style is consumed: the next install remembers whatever is active then.
-    if ('previousOutputStyle' in installState) {
-      const { previousOutputStyle, ...rest } = installState;
-      writeJson(args.installState, rest);
-    }
-  } else {
-    next = mergeSettings(settings, args.hooksDir);
-    if (settings.outputStyle !== OUTPUT_STYLE && !('previousOutputStyle' in installState)) {
-      writeJson(args.installState, { ...installState, previousOutputStyle: settings.outputStyle });
-    }
-  }
+  const next = args.target === 'codex' ? nextForCodex(args, settings) : nextForClaude(args, settings);
   if (JSON.stringify(settings) === JSON.stringify(next)) {
     console.log(`settings unchanged: ${args.settings}`);
     return;
@@ -148,4 +175,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { mergeSettings, removeSettings, hookCommand, HOOK_EVENTS, OUTPUT_STYLE };
+module.exports = { mergeHooks, removeHooks, mergeSettings, removeSettings, hookCommand, HOOK_EVENTS, OUTPUT_STYLE };

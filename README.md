@@ -4,7 +4,7 @@
 [![licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 ![Node 22+](https://img.shields.io/badge/node-22%2B-lightgrey)
 
-A terminal budget for [Claude Code](https://code.claude.com). The output style asks for replies within **12 lines / 900 characters** — the verdict first, up to three bullets, done — with anything longer (a code review, a research summary, a design proposal, a message you will forward) written to a Markdown file under `~/claude-out/` that opens in your editor by itself. A Stop hook measures every final reply; when one is over budget and no file was written, Claude is sent back once to move the content to a file and answer briefly.
+A terminal budget for [Claude Code](https://code.claude.com) and [Codex](https://developers.openai.com/codex). The output style asks for replies within **12 lines / 900 characters** — the verdict first, up to three bullets, done — with anything longer (a code review, a research summary, a design proposal, a message you will forward) written to a Markdown file under `~/claude-out/` that opens in your editor by itself. A Stop hook measures every final reply; when one is over budget and no file was written, Claude is sent back once to move the content to a file and answer briefly.
 
 ![Without: a 75-line review in the terminal. With the terminal budget: a three-line verdict in the terminal and the full review open in the editor.](docs/demo.svg)
 
@@ -23,7 +23,7 @@ A terminal budget for [Claude Code](https://code.claude.com). The output style a
 | piece | event | job |
 |---|---|---|
 | `hooks/budget-prompt.js` | `UserPromptSubmit` | notes whether you asked for the full text this turn; resets the list of files written |
-| `hooks/budget-open.js` | `PostToolUse` on `Write` | records every Markdown file written under `outDir` and starts `openCommand` on it |
+| `hooks/budget-open.js` | `PostToolUse` on `Write` (Claude Code) or `apply_patch` (Codex) | records every Markdown file written under `outDir` and starts `openCommand` on it |
 | `hooks/budget-stop.js` | `Stop` | measures the final reply; over budget it blocks once with an instruction to write the file and answer briefly |
 | `output-styles/verdict.md` | output style | the rule itself: verdict first, long content to a file |
 
@@ -34,6 +34,7 @@ What the hook cannot do: take text back. It runs after the reply is on screen, s
 ## Requirements
 
 - Claude Code **2.1.143 or newer** (the Stop hook's `last_assistant_message` field and the cap on hook continuations). On older 2.1 releases the hook sees no reply text, logs `allow_empty` and enforces nothing.
+- Or Codex CLI with lifecycle hooks (0.114 or newer; hooks are on by default). The same three scripts run there — Codex's hook events and fields match.
 - Node 22 or newer. No npm dependencies.
 - An opener: macOS uses `open -a <openApp>` (default Cursor); other systems default to `xdg-open`. Set `openCommand` for anything else.
 
@@ -42,13 +43,17 @@ What the hook cannot do: take text back. It runs after the reply is on screen, s
 ```sh
 git clone https://github.com/Gr0mar/verdict.git ~/verdict
 cd ~/verdict
-./install.sh
+./install.sh            # Claude Code
+./install.sh --codex    # Codex
 ```
 
-`install.sh` symlinks the hooks, the output style and the skills into `~/.claude/` and registers the hooks plus `"outputStyle": "verdict"` in `~/.claude/settings.json` — the file is rewritten after a backup, the merge is idempotent, and no other file is touched: a target that already exists and is not our symlink aborts the install. Restart Claude Code afterwards: hooks reload into running sessions, the output style is read at startup.
+**Claude Code:** `install.sh` symlinks the hooks, the output style and the skills into `~/.claude/` and registers the hooks plus `"outputStyle": "verdict"` in `~/.claude/settings.json` — the file is rewritten after a backup, the merge is idempotent, and no other file is touched: a target that already exists and is not our symlink aborts the install. Restart Claude Code afterwards: hooks reload into running sessions, the output style is read at startup.
+
+**Codex:** `install.sh --codex` registers the hooks in `~/.codex/hooks.json` (pointing at this checkout), puts the rule into `~/.codex/AGENTS.md` between `<!-- verdict:start -->` and `<!-- verdict:end -->` markers (Codex has no output styles; the rest of the file is left alone), and links the skills into `~/.codex/skills/`. Codex skips hooks it has not been told to trust: run `/hooks` in the CLI once and trust the three verdict hooks. Tested against the documented hook contract; please report how it behaves in the desktop app.
 
 ```sh
-./install.sh --uninstall   # removes the symlinks and hook entries, restores the outputStyle that was active at install time
+./install.sh --uninstall           # Claude Code: removes the symlinks and hook entries, restores the outputStyle active at install time
+./install.sh --codex --uninstall   # Codex: removes the hook entries, the AGENTS.md block and the skill links
 ```
 
 ## Asking for the full text
@@ -106,7 +111,7 @@ Three slash commands for prompts people type again and again. Each is a plain `S
 
 - Only the final message of a turn is measured; narration between tool calls is not, and the retry after a block is not measured again.
 - Lines are counted on `\n`, not on rendered height; the character budget bounds wrapping.
-- Files are detected through the `Write` tool only; a file produced by a shell command is not opened.
+- Files are detected through Claude Code's `Write` tool and Codex's `apply_patch`; a file produced by a shell command is not opened.
 - The hooks run through symlinks into this checkout, so an edit here is live in every session immediately. They fail open: on any internal error a hook exits 0 and prints nothing.
 
 ## Development
@@ -119,7 +124,8 @@ npm test   # node:test; hooks run as child processes in temporary sandboxes
 hooks/            budget-config.js (shared), budget-prompt.js, budget-open.js, budget-stop.js
 output-styles/    verdict.md
 skills/           fresh/, copilot/, pull/
-install/          merge-settings.js — idempotent settings.json merge and uninstall
+install/          merge-settings.js — idempotent hooks merge for settings.json (Claude Code) and hooks.json (Codex)
+                  agents-md.js — the rule as a marked block in Codex's AGENTS.md
 install.sh
 test/
 ```

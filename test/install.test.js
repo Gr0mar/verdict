@@ -46,7 +46,7 @@ test('install links every file, registers hooks, is idempotent, uninstall remove
   const settings = JSON.parse(fs.readFileSync(path.join(box.claudeDir, 'settings.json'), 'utf8'));
   assert.equal(settings.outputStyle, 'verdict');
   assert.equal(settings.hooks.Stop[0].hooks[0].command, `node "${path.join(box.claudeDir, 'hooks', 'budget-stop.js')}"`);
-  assert.equal(settings.hooks.PostToolUse[0].matcher, 'Write');
+  assert.equal(settings.hooks.PostToolUse[0].matcher, 'Write|apply_patch');
   assert.match(first.stdout, /Restart Claude Code/);
 
   const second = run(box);
@@ -61,6 +61,42 @@ test('install links every file, registers hooks, is idempotent, uninstall remove
   const after = JSON.parse(fs.readFileSync(path.join(box.claudeDir, 'settings.json'), 'utf8'));
   assert.equal(after.hooks, undefined);
   assert.equal(after.outputStyle, undefined);
+});
+
+test('--codex installs hooks.json, the AGENTS.md block and skills under CODEX_HOME; uninstall reverts; Claude files untouched', (t) => {
+  const box = sandbox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  const codexHome = path.join(box.root, 'codex');
+  const runCodex = (args = []) => spawnSync('bash', [INSTALL, '--codex', ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, CLAUDE_CONFIG_DIR: box.claudeDir, VERDICT_CONFIG_DIR: box.configDir, CODEX_HOME: codexHome },
+  });
+
+  const first = runCodex();
+  assert.equal(first.status, 0, first.stderr);
+  const hooks = JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8'));
+  assert.deepEqual(Object.keys(hooks.hooks), ['UserPromptSubmit', 'PostToolUse', 'Stop']);
+  assert.equal(hooks.hooks.Stop[0].hooks[0].command, `node "${path.join(ROOT, 'hooks', 'budget-stop.js')}"`);
+  assert.equal(hooks.outputStyle, undefined);
+  const agents = fs.readFileSync(path.join(codexHome, 'AGENTS.md'), 'utf8');
+  assert.match(agents, /<!-- verdict:start -->[\s\S]*# Terminal budget[\s\S]*<!-- verdict:end -->/);
+  for (const name of ['fresh', 'copilot', 'pull']) {
+    assert.equal(fs.readlinkSync(path.join(codexHome, 'skills', name)), path.join(ROOT, 'skills', name));
+  }
+  assert.equal(fs.existsSync(box.claudeDir), false, 'the Claude side is untouched');
+  assert.match(first.stdout, /\/hooks/);
+
+  const second = runCodex();
+  assert.equal(second.status, 0, second.stderr);
+  assert.match(second.stdout, /settings unchanged/);
+
+  const removed = runCodex(['--uninstall']);
+  assert.equal(removed.status, 0, removed.stderr);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8')), {});
+  assert.doesNotMatch(fs.readFileSync(path.join(codexHome, 'AGENTS.md'), 'utf8'), /verdict:start/);
+  for (const name of ['fresh', 'copilot', 'pull']) {
+    assert.equal(fs.existsSync(path.join(codexHome, 'skills', name)), false);
+  }
 });
 
 test('install refuses to replace a real file at a target path', (t) => {

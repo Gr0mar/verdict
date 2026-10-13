@@ -144,6 +144,56 @@ test('a missing open command is reported on stderr with the command that ran; st
   assert.deepEqual(readState(sandbox, 'sess-1').written, [fs.realpathSync(file)]);
 });
 
+function patchEvent(command, cwd, sessionId = 'sess-1') {
+  return { session_id: sessionId, hook_event_name: 'PostToolUse', cwd, tool_name: 'apply_patch', tool_input: { command }, tool_response: {} };
+}
+
+test('Codex apply_patch: files added or updated under outDir are recorded and opened, relative to cwd', (t) => {
+  const sandbox = makeSandbox();
+  t.after(() => cleanup(sandbox));
+  const added = createFile(path.join(sandbox.outDir, 'my-app', '2026-10-13-review.md'));
+  const updated = createFile(path.join(sandbox.outDir, 'my-app', '2026-10-13-plan.md'));
+  const command = [
+    '*** Begin Patch',
+    '*** Add File: claude-out/my-app/2026-10-13-review.md',
+    '+# Review',
+    '*** Update File: claude-out/my-app/2026-10-13-plan.md',
+    '@@',
+    '+more',
+    '*** Delete File: claude-out/my-app/old.md',
+    '*** End Patch',
+  ].join('\n');
+  const result = runHook(HOOK, patchEvent(command, sandbox.root), sandbox);
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, '');
+  assert.deepEqual(readState(sandbox, 'sess-1').written, [fs.realpathSync(added), fs.realpathSync(updated)]);
+  // Two detached openers; their log lines may interleave, so compare as multisets.
+  const calls = waitForOpenCalls(sandbox, 2 * (DEFAULT_ARGS.length + 1));
+  assert.deepEqual([...calls].sort(), [...DEFAULT_ARGS, fs.realpathSync(added), ...DEFAULT_ARGS, fs.realpathSync(updated)].sort());
+});
+
+test('Codex apply_patch: absolute paths work, files outside outDir and non-Markdown files are ignored', (t) => {
+  const sandbox = makeSandbox();
+  t.after(() => cleanup(sandbox));
+  const inside = createFile(path.join(sandbox.outDir, 'p', 'a.md'));
+  createFile(path.join(sandbox.root, 'src', 'index.ts'));
+  createFile(path.join(sandbox.outDir, 'p', 'notes.txt'));
+  const command = `*** Begin Patch\n*** Update File: ${inside}\n@@\n+x\n*** Update File: src/index.ts\n@@\n+y\n*** Add File: claude-out/p/notes.txt\n+z\n*** End Patch`;
+  runHook(HOOK, patchEvent(command, sandbox.root), sandbox);
+  assert.deepEqual(readState(sandbox, 'sess-1').written, [fs.realpathSync(inside)]);
+  assert.deepEqual(waitForOpenCalls(sandbox, DEFAULT_ARGS.length + 1), [...DEFAULT_ARGS, fs.realpathSync(inside)]);
+});
+
+test('Codex apply_patch without a cwd or with a non-string command is ignored', (t) => {
+  const sandbox = makeSandbox();
+  t.after(() => cleanup(sandbox));
+  createFile(path.join(sandbox.outDir, 'p', 'a.md'));
+  runHook(HOOK, patchEvent('*** Begin Patch\n*** Add File: claude-out/p/a.md\n+x\n*** End Patch', undefined), sandbox);
+  runHook(HOOK, patchEvent({ not: 'a string' }, sandbox.root), sandbox);
+  assert.equal(fs.existsSync(sandbox.stateDir), false);
+  assertNotOpened(sandbox);
+});
+
 test('malformed stdin or missing tool_input: exit 0, no stdout', (t) => {
   const sandbox = makeSandbox();
   t.after(() => cleanup(sandbox));
