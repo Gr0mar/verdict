@@ -87,6 +87,11 @@ remove_if_empty() {
 
 case "$TARGET/$ACTION" in
   claude/install)
+    # The plugin and this install would register the same hooks twice; keep one method.
+    if [ -f "$CLAUDE_DIR/plugins/installed_plugins.json" ] && grep -q '"verdict@' "$CLAUDE_DIR/plugins/installed_plugins.json"; then
+      echo "refusing: the plugin verdict@gr0mar is installed in $CLAUDE_DIR — keep the plugin, or run '/plugin uninstall verdict@gr0mar' first" >&2
+      exit 1
+    fi
     mkdir -p "$CONFIG_DIR"
     each_claude_link link
     node "$ROOT/install/merge-settings.js" --settings "$CLAUDE_DIR/settings.json" --hooks-dir "$CLAUDE_DIR/hooks" --install-state "$CONFIG_DIR/install-state.json"

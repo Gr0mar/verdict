@@ -35,7 +35,7 @@ What the hook cannot do: take text back. It runs after the reply is on screen, s
 
 - Claude Code **2.1.143 or newer** (the Stop hook's `last_assistant_message` field and the cap on hook continuations). On older 2.1 releases the hook sees no reply text, logs `allow_empty` and enforces nothing.
 - Or Codex **0.124.0 or newer** (stable lifecycle hooks, on by default, with `apply_patch` visible to PostToolUse). The same three scripts run there — Codex's hook events and fields match.
-- Node 22 or newer. No npm dependencies.
+- Node 22 or newer on the `PATH` the agent starts with (an app launched from the Dock may not see an nvm/fnm shim; then every event reports a hook error and nothing is enforced). No npm dependencies.
 - An opener: macOS uses `open -a <openApp>` (default Cursor); other systems default to `xdg-open`. Set `openCommand` for anything else.
 
 ## Install
@@ -47,7 +47,13 @@ What the hook cannot do: take text back. It runs after the reply is on screen, s
 /plugin install verdict@gr0mar
 ```
 
-The plugin bundles the hooks, the output style (applied automatically while the plugin is enabled) and the skills, which run as `/verdict:fresh`, `/verdict:copilot` and `/verdict:pull`. `/plugin uninstall verdict@gr0mar` removes everything. Pick one method: the plugin or the checkout below, not both — otherwise every hook runs twice.
+The plugin bundles the hooks, the output style and the skills, which run as `/verdict:fresh`, `/verdict:copilot` and `/verdict:pull`. Restart Claude Code after installing. What to know:
+
+- **The style is forced.** While the plugin is enabled, `verdict` overrides your `outputStyle` setting — `/output-style` may still print the old name, but the plugin's style is what runs. The only opt-out is disabling the plugin. (With the checkout install below, a project's `outputStyle` wins instead.)
+- **Updating.** Third-party marketplaces do not auto-update by default: run `claude plugin update verdict@gr0mar`, or turn on auto-update for `gr0mar` under `/plugin` → Marketplaces.
+- **Customising.** Plugin files are a cache copy replaced on every update, so edits to the style or the skills do not stick; `~/.config/verdict/budget.json` still applies. To change the wording, limits in the text or the output directory, use the checkout install.
+- **Uninstalling.** `/plugin uninstall verdict@gr0mar` removes the install record and `/plugin marketplace remove gr0mar` the marketplace. `~/.config/verdict/`, `~/.claude/state/verdict/` (log and session state) and `~/claude-out/` stay — delete them by hand if you want them gone.
+- **One Claude Code install, not two.** If you ran `install.sh` earlier, run `./install.sh --uninstall` before installing the plugin (the installer refuses to run while the plugin is installed). With both active every hook runs twice: double log lines, double blocks, double openers, skills as both `/fresh` and `/verdict:fresh`. The plugin and `install.sh --codex` do not conflict.
 
 **From a checkout** (Claude Code via `install.sh`, or Codex):
 
@@ -118,11 +124,11 @@ Per-session state lives next to the log (`<session_id>.json`, mode 0600) and is 
 
 ## Skills
 
-Three slash commands for prompts people type again and again. Each is a plain `SKILL.md`; edit the wording to taste.
+Three slash commands for prompts people type again and again. Each is a plain `SKILL.md`; with the checkout install, edit the wording to taste. Names: `/fresh` with the checkout install, `/verdict:fresh` with the plugin, `$fresh` in Codex.
 
-- `/fresh [scope]` — a fresh-eyes review of the work in this session, or of a named scope: weak spots, unclear parts, unfinished pieces.
-- `/copilot` — process GitHub Copilot's review comments on the current PR: apply the justified ones, draft replies for the rest, and — after you approve — post the replies and resolve the threads.
-- `/pull [what you expect]` — bring the repository you are in up to date: fast-forward pull on a clean tree, dependency install when the lockfile changed, `generate-api` when the project has that script, and a report of what changed.
+- `fresh [scope]` — a fresh-eyes review of the work in this session, or of a named scope: weak spots, unclear parts, unfinished pieces.
+- `copilot` — process GitHub Copilot's review comments on the current PR: apply the justified ones, draft replies for the rest, and — after you approve — post the replies and resolve the threads.
+- `pull [what you expect]` — bring the repository you are in up to date: fast-forward pull on a clean tree, dependency install when the lockfile changed, `generate-api` when the project has that script, and a report of what changed.
 
 ## Limitations
 
@@ -138,9 +144,10 @@ npm test   # node:test; hooks run as child processes in temporary sandboxes
 ```
 
 ```
-hooks/            budget-config.js (shared), budget-prompt.js, budget-open.js, budget-stop.js
+.claude-plugin/   plugin.json, marketplace.json — the repo is the plugin and its own marketplace
+hooks/            budget-config.js (shared), budget-prompt.js, budget-open.js, budget-stop.js, hooks.json (plugin wiring)
 output-styles/    verdict.md
-skills/           fresh/, copilot/, pull/
+skills/           fresh/, copilot/, pull/ (each with agents/openai.yaml for Codex)
 install/          merge-settings.js — idempotent hooks merge for settings.json (Claude Code) and hooks.json (Codex)
                   agents-md.js — the rule as a marked block in Codex's AGENTS.md
 install.sh

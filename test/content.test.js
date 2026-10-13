@@ -87,26 +87,17 @@ test('plugin manifests: one repo is the plugin and its own marketplace, versions
   const marketplace = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'marketplace.json'), 'utf8'));
   assert.equal(marketplace.name, 'gr0mar');
   assert.equal(marketplace.owner.name, 'Gr0mar');
-  assert.deepEqual(marketplace.plugins.map((p) => [p.name, p.source, p.version]), [['verdict', './', pkg.version]]);
+  // The entry carries no display fields of its own: plugin.json is the single source of truth.
+  assert.deepEqual(marketplace.plugins, [{ name: 'verdict', source: './' }]);
 });
 
-test('plugin hooks.json: the three events point at the bundled scripts through CLAUDE_PLUGIN_ROOT', () => {
-  const { hooks } = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks', 'hooks.json'), 'utf8'));
-  assert.deepEqual(Object.keys(hooks), ['UserPromptSubmit', 'PostToolUse', 'Stop']);
-  const expected = { UserPromptSubmit: 'budget-prompt.js', PostToolUse: 'budget-open.js', Stop: 'budget-stop.js' };
-  for (const [event, script] of Object.entries(expected)) {
-    assert.equal(hooks[event].length, 1, event);
-    const [group] = hooks[event];
-    assert.equal(group.hooks.length, 1, event);
-    const [hook] = group.hooks;
-    assert.equal(hook.type, 'command');
-    assert.equal(hook.command, `node "\${CLAUDE_PLUGIN_ROOT}/hooks/${script}"`);
-    assert.equal(hook.timeout, 5);
+test('plugin hooks.json: exactly what the installer registers, rooted at CLAUDE_PLUGIN_ROOT', () => {
+  const { mergeHooks, HOOK_EVENTS } = require('../install/merge-settings');
+  const bundled = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks', 'hooks.json'), 'utf8'));
+  assert.deepEqual(bundled, { hooks: mergeHooks({}, '${CLAUDE_PLUGIN_ROOT}/hooks').hooks });
+  for (const { script } of HOOK_EVENTS) {
     assert.ok(fs.existsSync(path.join(ROOT, 'hooks', script)), `${script} exists`);
   }
-  assert.equal(hooks.PostToolUse[0].matcher, 'Write|apply_patch');
-  assert.equal(hooks.UserPromptSubmit[0].matcher, undefined);
-  assert.equal(hooks.Stop[0].matcher, undefined);
 });
 
 test('verdict output style applies automatically when installed as a plugin', () => {

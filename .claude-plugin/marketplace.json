@@ -10,12 +10,7 @@
   "plugins": [
     {
       "name": "verdict",
-      "source": "./",
-      "description": "A terminal budget for Claude Code and Codex: verdict first, long content to a Markdown file that opens in your editor, measured by a Stop hook",
-      "version": "0.2.0",
-      "license": "MIT",
-      "homepage": "https://github.com/Gr0mar/verdict",
-      "keywords": ["terminal", "output", "hooks", "productivity", "verdict"]
+      "source": "./"
     }
   ]
 }

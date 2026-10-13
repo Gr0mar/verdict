@@ -47,6 +47,7 @@ test('install links every file, registers hooks, is idempotent, uninstall remove
   assert.equal(settings.outputStyle, 'verdict');
   assert.equal(settings.hooks.Stop[0].hooks[0].command, `node "${path.join(box.claudeDir, 'hooks', 'budget-stop.js')}"`);
   assert.equal(settings.hooks.PostToolUse[0].matcher, 'Write|apply_patch');
+  assert.equal(fs.existsSync(path.join(box.claudeDir, 'hooks', 'hooks.json')), false, 'the plugin wiring is never linked');
   assert.match(first.stdout, /Restart Claude Code/);
 
   const second = run(box);
@@ -139,6 +140,18 @@ test('--codex links skills before touching hooks.json or AGENTS.md, so a conflic
   assert.match(result.stderr, /refusing: .*pull exists and is not a symlink/);
   assert.equal(fs.existsSync(path.join(box.codexHome, 'hooks.json')), false);
   assert.equal(fs.existsSync(path.join(box.codexHome, 'AGENTS.md')), false);
+});
+
+test('install refuses while the verdict plugin is installed in the same config dir', (t) => {
+  const box = sandbox();
+  t.after(() => fs.rmSync(box.root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(box.claudeDir, 'plugins'), { recursive: true });
+  fs.writeFileSync(path.join(box.claudeDir, 'plugins', 'installed_plugins.json'), JSON.stringify({ version: 2, plugins: { 'verdict@gr0mar': [{ scope: 'user' }] } }));
+  const result = run(box);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /plugin verdict@gr0mar is installed/);
+  assert.equal(fs.existsSync(path.join(box.claudeDir, 'hooks')), false);
+  assert.equal(fs.existsSync(path.join(box.claudeDir, 'settings.json')), false);
 });
 
 test('install refuses to replace a real file at a target path', (t) => {
