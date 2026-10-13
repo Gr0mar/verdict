@@ -58,14 +58,48 @@ test('skills: Codex metadata keeps every skill user-invoked only', () => {
 });
 
 test('/pull is generic: only the cwd repository, clean tree, fast-forward only, deps by lockfile, no internal tooling', () => {
-  const { body } = frontmatter(path.join(ROOT, 'skills', 'pull', 'SKILL.md'));
+  const { fields, body } = frontmatter(path.join(ROOT, 'skills', 'pull', 'SKILL.md'));
   assert.match(body, /Only this repository/);
   assert.match(body, /git rev-parse --show-toplevel/);
   assert.match(body, /git status --porcelain/);
   assert.match(body, /pull --ff-only/);
+  assert.match(body, /without an upstream/);
+  assert.match(body, /git rev-parse --abbrev-ref @\{u\}/);
+  assert.match(body, /--untracked-files=no/);
+  assert.doesNotMatch(body, /ORIG_HEAD/, 'the pulled range is anchored on a recorded HEAD, not on ORIG_HEAD');
+  assert.doesNotMatch(body, /git fetch origin/, 'pull fetches by itself; the remote may not be called origin');
   assert.match(body, /Never stash, reset or check out another branch/);
   assert.match(body, /pnpm install/);
+  assert.match(body, /git submodule update --init/);
+  assert.match(body, /`generate-api`, `generate:api`, `api:generate`, `codegen`/, 'only clearly named generator scripts run');
+  assert.match(body, /Never run a generic `generate`, `build` or `prepare` script/);
   assert.match(body, /Never edit generated files/);
+  assert.match(body, /What I expect to have landed/);
+  assert.doesNotMatch(`${fields.description}\n${body}`, /from the backend/, 'no frontend\/backend assumption');
+});
+
+test('/fresh defines severity, lists what was checked and stays in scope', () => {
+  const { body } = frontmatter(path.join(ROOT, 'skills', 'fresh', 'SKILL.md'));
+  assert.match(body, /Critical — /);
+  assert.match(body, /Important — /);
+  assert.match(body, /Minor — /);
+  assert.match(body, /"Checked:"/);
+  assert.match(body, /"Out of scope"/);
+  assert.match(body, /code, configuration, docs, migrations/);
+  assert.match(body, /git diff HEAD/);
+  assert.match(body, /nothing changed/);
+});
+
+test('community files exist and the issue templates ask which agent is affected', () => {
+  for (const file of ['CONTRIBUTING.md', 'SECURITY.md', 'CODE_OF_CONDUCT.md', '.github/PULL_REQUEST_TEMPLATE.md', '.github/ISSUE_TEMPLATE/config.yml']) {
+    assert.ok(fs.existsSync(path.join(ROOT, file)), file);
+  }
+  for (const form of ['bug.yml', 'feature.yml']) {
+    const text = fs.readFileSync(path.join(ROOT, '.github', 'ISSUE_TEMPLATE', form), 'utf8');
+    assert.match(text, /Claude Code/);
+    assert.match(text, /Codex/);
+  }
+  assert.match(fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8'), /## Contributing/);
 });
 
 test('nothing shipped names a machine-specific path or a specific editor', () => {

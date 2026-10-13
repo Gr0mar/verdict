@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and setups
+    url: https://github.com/Gr0mar/verdict/discussions
+    about: How others configure the budget, trigger phrases, openers — and anything that is not a bug or a feature request.
+  - name: Security or conduct report (private)
+    url: https://github.com/Gr0mar/verdict/security/advisories/new
+    about: Reaches only the maintainer. Use it for vulnerabilities and for conduct reports.

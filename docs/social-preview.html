@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- Source of docs/social-preview.png (GitHub social preview, 1280×640).
+     Render: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars
+             --window-size=1280,640 --screenshot=docs/social-preview.png docs/social-preview.html -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>verdict</title>
+<style>
+  html, body { margin: 0; width: 1280px; height: 640px; background: #11111b; overflow: hidden; }
+  body { font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; color: #cdd6f4; }
+  .wrap { position: relative; width: 1280px; height: 640px; }
+  .title { position: absolute; left: 64px; top: 52px; font-size: 46px; font-weight: 700; letter-spacing: -1px; color: #ffffff; white-space: nowrap; }
+  .title span { color: #a6e3a1; }
+  .sub { position: absolute; left: 64px; top: 122px; font-size: 23px; line-height: 1.35; color: #bac2de; width: 1150px; }
+  .demo { position: absolute; left: 64px; top: 212px; width: 1152px; }
+  .demo svg { width: 1152px; height: auto; display: block; }
+  .foot { position: absolute; left: 64px; bottom: 28px; font-size: 20px; color: #6c7086; font-family: "SF Mono", Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title">verdict <span>·</span> a terminal budget for Claude Code and Codex</div>
+  <div class="sub">Verdict first, up to three bullets, 12 lines max. Anything longer lands in a Markdown file that opens in your editor — measured by a Stop hook, not left to the prompt.</div>
+  <div class="demo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">
+      <style>
+        .t { fill: #cdd6f4; } .dim { fill: #6c7086; } .ok { fill: #a6e3a1; } .warn { fill: #f9e2af; } .path { fill: #89b4fa; }
+        .label { fill: #bac2de; font-size: 12px; letter-spacing: 1px; }
+      </style>
+      <text x="20" y="18" class="label">WITHOUT</text>
+      <rect x="20" y="28" width="440" height="262" rx="8" fill="#1e1e2e" stroke="#313244"/>
+      <circle cx="40" cy="44" r="5" fill="#f38ba8"/><circle cx="56" cy="44" r="5" fill="#f9e2af"/><circle cx="72" cy="44" r="5" fill="#a6e3a1"/>
+      <g class="t">
+        <text x="36" y="72" class="dim">&gt; review this branch</text>
+        <text x="36" y="96">Here's a detailed review of the branch. I went</text>
+        <text x="36" y="114">through all 14 changed files and found several</text>
+        <text x="36" y="132">things worth discussing in depth:</text>
+        <text x="36" y="156">## 1. State handling in useBudget.ts</text>
+        <text x="36" y="174">The hook recomputes the total on every render</text>
+        <text x="36" y="192">because the dependency array includes the whole</text>
+        <text x="36" y="210">items object rather than its stable id. This</text>
+        <text x="36" y="228">matters because the parent re-renders on every</text>
+        <text x="36" y="246">keystroke, so the reducer runs ~40 times per...</text>
+        <text x="36" y="274" class="dim">▼ 61 more lines</text>
+      </g>
+      <text x="500" y="18" class="label">WITH VERDICT</text>
+      <rect x="500" y="28" width="440" height="118" rx="8" fill="#1e1e2e" stroke="#313244"/>
+      <circle cx="520" cy="44" r="5" fill="#f38ba8"/><circle cx="536" cy="44" r="5" fill="#f9e2af"/><circle cx="552" cy="44" r="5" fill="#a6e3a1"/>
+      <g class="t">
+        <text x="516" y="72" class="dim">&gt; review this branch</text>
+        <text x="516" y="96"><tspan class="ok">●</tspan> Mergeable after two fixes.</text>
+        <text x="516" y="114">  - useBudget.ts:41 recomputes each render — memoise</text>
+        <text x="516" y="132">  <tspan class="path">~/claude-out/my-app/2026-10-13-review-budget.md</tspan></text>
+      </g>
+      <rect x="500" y="160" width="440" height="130" rx="8" fill="#181825" stroke="#313244"/>
+      <rect x="500" y="160" width="440" height="26" rx="8" fill="#11111b"/>
+      <text x="516" y="178" class="dim">2026-10-13-review-budget.md — opened in your editor</text>
+      <g class="t">
+        <text x="516" y="208" class="warn"># Review: budget screen</text>
+        <text x="516" y="230"><tspan class="ok">Verdict:</tspan> mergeable after two fixes.</text>
+        <text x="516" y="254" class="warn">## 1. State handling in useBudget.ts</text>
+        <text x="516" y="272">The hook recomputes the total on every render...</text>
+      </g>
+    </svg>
+  </div>
+  <div class="foot">github.com/Gr0mar/verdict · /plugin install verdict@gr0mar · MIT</div>
+</div>
+</body>
+</html>
