@@ -1,6 +1,6 @@
 {
   "name": "verdict",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "A terminal budget for Claude Code and Codex: verdict first, long content to a Markdown file that opens in your editor, measured by a Stop hook",
   "license": "MIT",

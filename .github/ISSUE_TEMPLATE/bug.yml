@@ -28,6 +28,7 @@ body:
         - Plugin (/plugin install verdict@gr0mar)
         - Checkout (install.sh)
         - Checkout (install.sh --codex)
+        - Plugin for Claude Code + install.sh --codex
     validations:
       required: true
   - type: textarea

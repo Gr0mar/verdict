@@ -11,4 +11,4 @@
 - [ ] `npm test` passes
 - [ ] hooks still fail open (exit 0, nothing on stdout) on their own errors
 - [ ] no new dependencies
-- [ ] README updated where behaviour or installation changed
+- [ ] README or `docs/` updated where behaviour or installation changed

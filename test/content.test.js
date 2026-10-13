@@ -64,6 +64,10 @@ test('/pull is generic: only the cwd repository, clean tree, fast-forward only, 
   assert.match(body, /git status --porcelain/);
   assert.match(body, /pull --ff-only/);
   assert.match(body, /without an upstream/);
+  assert.match(body, /git rev-parse --abbrev-ref @\{u\}/);
+  assert.match(body, /--untracked-files=no/);
+  assert.doesNotMatch(body, /ORIG_HEAD/, 'the pulled range is anchored on a recorded HEAD, not on ORIG_HEAD');
+  assert.doesNotMatch(body, /git fetch origin/, 'pull fetches by itself; the remote may not be called origin');
   assert.match(body, /Never stash, reset or check out another branch/);
   assert.match(body, /pnpm install/);
   assert.match(body, /git submodule update --init/);
@@ -82,6 +86,8 @@ test('/fresh defines severity, lists what was checked and stays in scope', () =>
   assert.match(body, /"Checked:"/);
   assert.match(body, /"Out of scope"/);
   assert.match(body, /code, configuration, docs, migrations/);
+  assert.match(body, /git diff HEAD/);
+  assert.match(body, /nothing changed/);
 });
 
 test('community files exist and the issue templates ask which agent is affected', () => {

@@ -6,7 +6,7 @@ Two ways: the plugin (recommended) or a checkout with `install.sh`. Use one of t
 
 - Claude Code **2.1.143 or newer** — the Stop hook's `last_assistant_message` field and the cap on hook continuations. On older 2.1 releases the hook sees no reply text, logs `allow_empty` and enforces nothing.
 - Node 22 or newer on the `PATH` the agent starts with. An app launched from the Dock may not see an nvm/fnm shim; then every event reports a hook error and nothing is enforced.
-- An opener: macOS uses `open -a Cursor` by default; set `openCommand` for anything else (see Configuration in the README).
+- An opener: macOS uses `open -a Cursor` by default, other systems `xdg-open`; set `openCommand` for anything else (see Configuration in the README).
 
 ## Plugin
 

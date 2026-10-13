@@ -48,7 +48,7 @@ The second round is never blocked, so there is no loop. The hook cannot take tex
 
 Say so in the prompt and the budget is lifted for that one turn:
 
-- English: `elaborate`, `in detail`, `in full`, `verbatim`, `show me everything`, `show me the code`, `in the terminal`, `verbose`
+- English: `elaborate`, `in detail`, `in full`, `verbatim`, `show me everything`, `show me the code`, `put it in the terminal`, `verbose`
 - Czech: `rozveď`, `podrobně`, `do terminálu`, `vypiš celé`, `ukaž mi kód`
 
 Request phrases only — `detail view`, `full width` or `code review of the whole branch` do not count. Configurable regex (`detailPattern`).
