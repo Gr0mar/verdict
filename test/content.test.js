@@ -51,7 +51,7 @@ test('skills: frontmatter follows the Claude Code reference, bodies carry the ow
     assert.match(text, /^argument-hint: "\[[^\]]+\]"$/m, `${name}: argument-hint stays quoted; an unquoted [..] is a YAML list`);
     assert.equal(fields['disable-model-invocation'], 'true', `${name}: user-invoked only`);
     assert.ok(body.includes('$ARGUMENTS'), `${name}: $ARGUMENTS`);
-    assert.match(body, /placeholder[^.]*my message/, `${name}: Codex leaves the placeholder in place, so the argument is then taken from the message`);
+    assert.match(body, /placeholder[^.]*(my|the user's) message/, `${name}: Codex leaves the placeholder in place, so the argument is then taken from the message`);
     assert.ok(body.includes(expected.phrase), `${name}: phrase "${expected.phrase}"`);
     assert.ok(body.length < 3600, `${name}: body is ${body.length} chars; it is loaded on every invocation, keep it lean`);
   }
@@ -112,8 +112,28 @@ test('/pull is generic: only the cwd repository, clean tree, fast-forward only, 
   assert.doesNotMatch(`${fields.description}\n${body}`, /from the backend/, 'no frontend\/backend assumption');
 });
 
-test('/fresh defines severity, lists what was checked and stays in scope', () => {
+test('/fresh runs in a forked read-only agent that waits for the result; the other skills stay in the session', () => {
+  const { fields, body } = frontmatter(path.join(ROOT, 'skills', 'fresh', 'SKILL.md'));
+  assert.equal(fields.context, 'fork', 'fresh eyes means a context that did not write the code');
+  assert.equal(fields.agent, 'Explore', 'the built-in read-only agent: no Write or Edit tool at all');
+  assert.equal(fields.background, 'false', 'the invoking turn waits for the review');
+  // The fork sees no conversation, so the repository state is injected before the prompt is sent.
+  assert.match(body, /^!`git status --short`$/m);
+  assert.match(body, /^!`git log --oneline -15`$/m);
+  assert.match(body, /run the commands yourself/, 'Codex shows the injection lines literally');
+  assert.match(body, /"Questions"/, 'unknown intent becomes a question, not a finding');
+  for (const name of ['copilot', 'pull']) {
+    const other = frontmatter(path.join(ROOT, 'skills', name, 'SKILL.md')).fields;
+    assert.equal(other.context, undefined, `${name} edits or pulls, it needs the session`);
+  }
+});
+
+test('/fresh defines severity, lists what was checked, verifies before reporting and stays in scope', () => {
   const { body } = frontmatter(path.join(ROOT, 'skills', 'fresh', 'SKILL.md'));
+  assert.match(body, /inputs that break it/);
+  assert.match(body, /failure paths/);
+  assert.match(body, /assert a mock instead of the behaviour/);
+  assert.match(body, /Second pass:/);
   assert.match(body, /Critical — /);
   assert.match(body, /Important — /);
   assert.match(body, /Minor — /);
@@ -122,8 +142,8 @@ test('/fresh defines severity, lists what was checked and stays in scope', () =>
   assert.match(body, /code, configuration, docs, migrations/);
   assert.match(body, /git diff HEAD/);
   assert.match(body, /nothing changed/);
-  assert.match(body, /change no project file/, 'a review changes nothing but its own report');
-  assert.match(body, /read every `\?\?` file/, 'untracked files are part of the review; git diff HEAD does not show them');
+  assert.match(body, /must not change any file/, 'a review changes nothing');
+  assert.match(body, /every `\?\?` file/, 'untracked files are part of the review; git diff HEAD does not show them');
   assert.match(body, /Report what you verified/, 'no speculative findings');
 });
 
