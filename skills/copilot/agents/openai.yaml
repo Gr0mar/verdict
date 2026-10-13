@@ -1,2 +1,5 @@
+interface:
+  display_name: "Copilot review"
+  short_description: "Apply or answer Copilot's PR review comments; resolve after approval"
 policy:
   allow_implicit_invocation: false
