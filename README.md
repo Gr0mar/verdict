@@ -70,11 +70,17 @@ The style text and the three skills carry the defaults (`12 lines`, `~/claude-ou
 
 ## Skills
 
-- `fresh [scope]` — fresh-eyes review of the uncommitted changes (or the latest commits when the tree is clean), a named scope or a PR number, run in a separate agent without Write or Edit tools so the context that wrote the code does not grade it: weak spots by severity, open questions, nothing changed. Reads the repository's `CLAUDE.md` and `REVIEW.md` as review rules.
+- `fresh [scope]` — fresh-eyes review of the uncommitted changes (or the latest commits when the tree is clean), a named scope or a PR number, run in Claude Code as a separate agent without Write or Edit tools so the context that wrote the code does not grade it (Codex: in-session): weak spots by severity, open questions, nothing changed. Reads the repository's `CLAUDE.md` and `REVIEW.md` as review rules.
 - `copilot [PR number]` — work through Copilot's review of a PR (default: the current branch's PR); already-resolved threads are skipped, and the push, the replies and the resolving wait for your approval.
 - `pull [what you expect to have landed]` — fast-forward pull on a clean tree, dependency install when the lockfile changed, a `generate-api` / `generate:api` / `api:generate` / `codegen` script when package.json has one, report.
 
 Called `/fresh` from a checkout, `/verdict:fresh` from the plugin, `$fresh` in Codex.
+
+### Why `/fresh` runs in a fork
+
+A review written in the conversation that produced the code inherits that conversation's assumptions. In Claude Code, `/fresh` therefore runs as a separate subagent (`context: fork`, the Explore agent without Write or Edit tools, on the session's model): a fresh context that has never seen the conversation, gets the repository state injected, reads the files and the project's rules, and returns the review for the session to save. Codex has no forked skills, so there `$fresh` runs in-session and is told to set aside what it saw. On its first run it reviewed this repository's own `/copilot` skill and found three flaws — threads resolved before the fixes were pushed, a stop rule that fired on any bot, suppressed comments raised again on every run — fixed in [#6](https://github.com/Gr0mar/verdict/pull/6).
+
+The skills pre-approve only exact read commands (`git status`, `git diff HEAD`, `git log`, `gh pr view`, `gh pr diff`) plus, for `/pull`, the fast-forward pull and the submodule checkout it exists for. `git diff`, `git log` and `git show` accept `--output=<file>`, so a wildcard rule such as `Bash(git diff *)` would let a reviewed file talk the model into writing somewhere without a prompt; every other command asks.
 
 ## Log
 
