@@ -52,6 +52,19 @@ test('a Markdown file under outDir is recorded and opened with the open command'
   assert.deepEqual(waitForOpenCalls(sandbox, DEFAULT_ARGS.length + 1), [...DEFAULT_ARGS, fs.realpathSync(file)]);
 });
 
+test('autoOpen false records the file but opens nothing', (t) => {
+  const sandbox = makeSandbox();
+  t.after(() => cleanup(sandbox));
+  writeConfig(sandbox, { autoOpen: false });
+  const file = createFile(path.join(sandbox.outDir, 'p', 'a.md'));
+  const result = runHook(HOOK, writeEvent(file), sandbox);
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, '');
+  assert.deepEqual(readState(sandbox, 'sess-1').written, [fs.realpathSync(file)]);
+  // Waits as long as a real opener would need to show up, not only the short grace period.
+  assert.deepEqual(waitForOpenCalls(sandbox, 1, 1000), []);
+});
+
 test('openApp from config is used', (t) => {
   const sandbox = makeSandbox();
   t.after(() => cleanup(sandbox));

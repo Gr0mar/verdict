@@ -40,6 +40,7 @@ const DEFAULTS = Object.freeze({
   maxChars: 900,
   outDir: '~/claude-out',
   openApp: 'Cursor',
+  autoOpen: true,
   detailPattern: DEFAULT_DETAIL_PATTERN,
 });
 
@@ -82,6 +83,7 @@ function pickValid(raw) {
   if (isNonEmptyString(raw.outDir)) out.outDir = raw.outDir;
   if (isNonEmptyString(raw.openApp)) out.openApp = raw.openApp;
   if (isCommand(raw.openCommand)) out.openCommand = raw.openCommand.slice();
+  if (typeof raw.autoOpen === 'boolean') out.autoOpen = raw.autoOpen;
   if (isNonEmptyString(raw.detailPattern)) out.detailPattern = raw.detailPattern;
   return out;
 }

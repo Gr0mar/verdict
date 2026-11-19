@@ -31,6 +31,7 @@ test('loadConfig: defaults apply when the file sets only outDir', (t) => {
     assert.equal(loaded.maxLines, 12);
     assert.equal(loaded.maxChars, 900);
     assert.equal(loaded.openApp, 'Cursor');
+    assert.equal(loaded.autoOpen, true);
     assert.equal(loaded.outDir, sandbox.outDir);
     assert.ok(loaded.detailRegex instanceof RegExp);
     assert.equal(loaded.detailPattern, config.DEFAULT_DETAIL_PATTERN);
@@ -40,12 +41,13 @@ test('loadConfig: defaults apply when the file sets only outDir', (t) => {
 test('loadConfig: values of the wrong type fall back to defaults', (t) => {
   const sandbox = makeSandbox();
   t.after(() => cleanup(sandbox));
-  writeConfig(sandbox, { maxLines: '20', maxChars: -5, openApp: '   ', detailPattern: 42 });
+  writeConfig(sandbox, { maxLines: '20', maxChars: -5, openApp: '   ', detailPattern: 42, autoOpen: 'false' });
   withSandbox(sandbox, (config) => {
     const loaded = config.loadConfig();
     assert.equal(loaded.maxLines, 12);
     assert.equal(loaded.maxChars, 900);
     assert.equal(loaded.openApp, 'Cursor');
+    assert.equal(loaded.autoOpen, true);
     assert.equal(loaded.detailPattern, config.DEFAULT_DETAIL_PATTERN);
   });
 });
@@ -53,9 +55,10 @@ test('loadConfig: values of the wrong type fall back to defaults', (t) => {
 test('loadConfig: valid overrides win and ~ in outDir expands', (t) => {
   const sandbox = makeSandbox();
   t.after(() => cleanup(sandbox));
-  writeConfig(sandbox, { maxLines: 20, maxChars: 1500, openApp: 'Marked 2', outDir: '~/somewhere' });
+  writeConfig(sandbox, { maxLines: 20, maxChars: 1500, openApp: 'Marked 2', outDir: '~/somewhere', autoOpen: false });
   withSandbox(sandbox, (config) => {
     const loaded = config.loadConfig();
+    assert.equal(loaded.autoOpen, false);
     assert.equal(loaded.maxLines, 20);
     assert.equal(loaded.maxChars, 1500);
     assert.equal(loaded.openApp, 'Marked 2');
