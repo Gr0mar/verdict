@@ -38,7 +38,7 @@ Restart the agent afterwards. Needs Node 22+ on the `PATH`, Claude Code 2.1.143+
 | piece | event | job |
 |---|---|---|
 | `budget-prompt.js` | `UserPromptSubmit` | notes whether you asked for the full text this turn |
-| `budget-open.js` | `PostToolUse` (`Write` / `apply_patch`) | opens every Markdown file written under `outDir` |
+| `budget-open.js` | `PostToolUse` (`Write` / `apply_patch`) | records every Markdown file written under `outDir` and opens it (unless `autoOpen` is `false`) |
 | `budget-stop.js` | `Stop` | measures the final reply; over budget without a file, blocks once with "write the file, answer briefly" |
 | `verdict.md` | output style / `AGENTS.md` | the rule itself |
 
@@ -64,6 +64,7 @@ Request phrases only — `detail view`, `full width` or `code review of the whol
 | `outDir` | `"~/claude-out"` | where long content goes: `<outDir>/<project>/<YYYY-MM-DD>-<slug>.md` |
 | `openApp` | `"Cursor"` | macOS: `open -a <app>` |
 | `openCommand` | `["open","-a","Cursor"]` / `["xdg-open"]` | executable plus arguments, file path appended; overrides `openApp` |
+| `autoOpen` | `true` | `false` keeps writing the file but never opens it; the terminal reply still names its path |
 | `detailPattern` | request phrases, English + Czech | case-insensitive regex that lifts the budget for one turn |
 
 The style text and the three skills carry the defaults (`12 lines`, `~/claude-out`); if you change them, edit `output-styles/verdict.md` and `skills/*/SKILL.md` to match (checkout install only — see [docs/plugin.md](docs/plugin.md)).

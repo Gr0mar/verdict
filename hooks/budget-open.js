@@ -2,8 +2,8 @@
 'use strict';
 // verdict — PostToolUse hook (matcher: Write|apply_patch).
 // When the agent writes a Markdown file under outDir — Claude Code's Write tool or
-// Codex's apply_patch — records it in the session state and opens it in the
-// configured app. Never blocks, never prints to stdout.
+// Codex's apply_patch — records it in the session state and, unless autoOpen is
+// false, opens it in the configured app. Never blocks, never prints to stdout.
 
 const fs = require('fs');
 const path = require('path');
@@ -80,7 +80,7 @@ function main(raw) {
       const resolved = resolveOutFile(candidate, config.outDir);
       if (!resolved) continue;
       recordWritten(data.session_id, resolved);
-      openFile(resolved, config);
+      if (config.autoOpen) openFile(resolved, config);
     }
   } catch (e) {
     // fail-open: never block, never print
